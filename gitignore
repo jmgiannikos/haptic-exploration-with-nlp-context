@@ -123,6 +123,7 @@ dmypy.json
 .outputs/
 .simulation/grasp_datasets/
 .simultaion/outputs/
+.simulation/movement_datasets/
 
 # Pyre type checker
 .pyre/
