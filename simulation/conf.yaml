@@ -1,0 +1,60 @@
+tacto:
+  width: 120
+  height: 160
+  visualize_gui: True
+
+pybullet_camera:
+  cameraDistance: 0.6
+  cameraYaw: 15.
+  cameraPitch: -20.
+  cameraTargetPosition: [0.5, 0, 0.08]
+
+block:
+  urdf_path: "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/objects/simple_shapes/block1.urdf"
+  base_position: [0.50, 0, 0.075]
+  global_scaling: 1
+
+cube:
+  urdf_path: "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/objects/simple_shapes/cube1.urdf"
+  base_position: [0.50, 0, 0.025]
+  global_scaling: 1
+
+cylinder:
+  urdf_path: "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/objects/simple_shapes/cylinder1.urdf"
+  base_position: [0.50, 0, 0.05]
+  global_scaling: 0.03
+
+cone:
+  urdf_path: "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/objects/simple_shapes/cone1.urdf"
+  base_position: [0.50, 0, 0.05]
+  global_scaling: 0.05
+
+sphere:
+  urdf_path: "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/objects/simple_shapes/sphere1.urdf"
+  base_position: [0.50, 0, 0.04]
+  global_scaling: 0.03
+
+ico_sphere:
+  urdf_path: "/home/jan-malte/Bachelors Thesis/simulation/haptic-exploration-with-nlp-context/objects/simple_shapes/ico_sphere1.urdf"
+  base_position: [0.50, 0, 0.025]
+  global_scaling: 0.03
+
+truncated_cone:
+  urdf_path: "/home/jan-malte/Bachelors Thesis/simulation/haptic-exploration-with-nlp-context/objects/simple_shapes/truncated_cone1.urdf"
+  base_position: [0.50, 0, 0.05]
+  global_scaling: 0.05
+
+mug3:
+  urdf_path: "/home/jan-malte/Bachelors Thesis/simulation/haptic-exploration-with-nlp-context/objects/household_objects/mug3.urdf"
+  base_position: [0.50, 0, 0.025]
+  global_scaling: 0.1
+
+mug1:
+  urdf_path: "/home/jan-malte/Bachelors Thesis/simulation/haptic-exploration-with-nlp-context/objects/household_objects/mug1.urdf"
+  base_position: [0.50, 0, 0.02]
+  global_scaling: 1
+
+mug2:
+  urdf_path: "/home/jan-malte/Bachelors Thesis/simulation/haptic-exploration-with-nlp-context/objects/household_objects/mug2.urdf"
+  base_position: [0.50, 0, 0.02]
+  global_scaling: 0.02

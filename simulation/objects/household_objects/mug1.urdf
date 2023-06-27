@@ -1,0 +1,37 @@
+<?xml version="1.0" ?>
+<robot name="mug1.urdf">
+  <link name="baseLink">
+    <contact>
+    	<friction_anchor/>
+    	<lateral_friction value="0.5"/>
+        <rolling_friction value="0.005"/>
+        <spinning_friction value="0.005"/>
+    </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="0.3"/>
+      <inertia ixx="0.00000016370" ixy="0.00000000002" ixz="-0.00000000695" iyy="0.00000020266" iyz="0.00000000001" izz="0.00000017603"/>
+    </inertial>
+    <visual>
+      <origin rpy="1.5707 0 0" xyz="0 0 0"/>
+      <geometry>
+	  <mesh filename="mug1_decomp.obj" scale="1 1 1"/>
+      </geometry>
+       <material name="white">
+          <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="1.5707 0 0" xyz="0 0 0"/>
+      <geometry>
+	 <mesh filename="mug1_decomp.obj" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>
+
+<!-- 
+0.00000016370 0.00000000002 -0.00000000695
+0.00000000002 0.00000020266 0.00000000001
+-0.00000000695 0.00000000001 0.00000017603
+-->
