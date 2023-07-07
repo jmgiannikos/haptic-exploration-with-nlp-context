@@ -11,6 +11,7 @@ import statistics
 import os
 import random
 import matplotlib.pyplot as plt
+from sklearn.metrics import PrecisionRecallDisplay
 
 NUM_EPOCHS = 4
 VERBOSE = False
@@ -18,6 +19,9 @@ PIXEL_REDUCTION_FACTOR = 2
 PATH = "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/"
 FILE_NAME = "grasp_block_semi_random"
 NO_CROSSVAL = True
+MODEL_PATH = "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/block training model snapshots/_model_snapshot_70"
+EVAL_SET = "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/grasp_block_semi_random.npz"
+TRAIN = False
 
 class Depth_Grasp_Alex_Classifier(nn.Module):
     def __init__(self, num_classes: int = 2, dropout: float = 0.5) -> None:
@@ -250,14 +254,23 @@ def reduce_depth_image_fidelity(depth_images, reduction_factor_x=2, reduction_fa
 
 def validate_classifier(model, val_loader, result_dict):
     pred_labels = []
+    gt_labels = []
+    pred_pos_probabilities = []
     j = 0
     for data in val_loader:
         inputs, label = data
+        gt_labels.append(label.detach().numpy()[0])
         prediction = model(inputs)
+        prediction = prune_dimensions(prediction.detach().numpy())
+
+        pred_pos_probability = (prediction/np.sum(prediction))[1]
+
+        pred_pos_probabilities.append(pred_pos_probability)
+
         max_pred = -float("inf")
         max_pred_idx = None
         i = 0
-        for pred in prediction[0]:
+        for pred in prediction:
             if pred > max_pred:
                 max_pred = pred
                 max_pred_idx = i
@@ -265,12 +278,14 @@ def validate_classifier(model, val_loader, result_dict):
 
         if j <= 10:
             render_depth(inputs)
-            print("predition:" + str(prediction))
+            print("predicted positive probability:" + str(pred_pos_probability))
             print("pred label:" + str(max_pred_idx))
             print("gt label:" + str(label))
             j += 1
 
         pred_labels.append(max_pred_idx)
+
+    PrecisionRecallDisplay.from_predictions(y_true=gt_labels, y_pred=pred_pos_probabilities)
 
     true_positives = 0
     false_positives = 0
@@ -309,7 +324,25 @@ def validate_classifier(model, val_loader, result_dict):
     else:
         result_dict["recall"] = [recall]
 
-    return true_positives, false_positives, true_negatives, false_negatives
+    if "tp" in result_dict.keys():
+        result_dict["tp"].append(true_positives)
+    else:
+        result_dict["tp"] = [true_positives]
+
+    if "tn" in result_dict.keys():
+        result_dict["tn"].append(true_negatives)
+    else:
+        result_dict["tn"] = [true_negatives]
+
+    if "fp" in result_dict.keys():
+        result_dict["fp"].append(false_positives)
+    else:
+        result_dict["fp"] = [false_positives]
+
+    if "fn" in result_dict.keys():
+        result_dict["fn"].append(false_negatives)
+    else:
+        result_dict["fn"] = [false_negatives]
 
 
 def get_dataset_paths(dataset_path_base):
@@ -415,8 +448,21 @@ def train_test_depth_pipeline(dataset_path=""):
     print("average Precision:" + str(statistics.mean(validation_results["precision"])))
     print("average Recall:" + str(statistics.mean(validation_results["recall"])))
 
+def load_and_eval(model_path=MODEL_PATH, eval_set_path=EVAL_SET):
+    validation_results = {}
+    model = torch.load(model_path)
+    #model.load_state_dict(torch.load(model_path))
+    val_data, val_labels = load_depth_dataset(dataset_path=eval_set_path)
+    val_loader = dataset_to_data_loader(dataset=(val_data, val_labels))
+    validate_classifier(model, val_loader, validation_results)
+    print(validation_results)
+
+
 def main():
-    train_test_depth_pipeline(PATH + FILE_NAME)
+    if TRAIN:
+        train_test_depth_pipeline(PATH + FILE_NAME)
+    else:
+        load_and_eval()
 
 if __name__ == '__main__':
     main()
