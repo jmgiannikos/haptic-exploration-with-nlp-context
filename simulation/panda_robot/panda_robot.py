@@ -731,19 +731,6 @@ class PandaRobot:
                 errors = [delta_ee_pose]
             else:
                 errors = np.append(errors, [delta_ee_pose], 0)
-
-            if np.max(np.abs(delta_ee_pose)) <= atol:
-                joint_config = (current_joint_angles).flatten().tolist()
-                if joint_config[-1] != 0:
-                    print("WARNING: joint config of fixed joint not 0")
-                joint_config = joint_config[0:-1]
-                return joint_config, errors, adjustment_mag
-            elif iteration > max_iter:
-                joint_config = (q_init.T + best_solution).flatten().tolist()
-                if joint_config[-1] != 0:
-                    print("WARNING: joint config of fixed joint not 0")
-                joint_config = joint_config[0:-1]
-                return joint_config, errors, adjustment_mag
             
             #calculate current jacobian matrix
             current_jacobian = self.calculate_jacobian(current_joint_angles)
@@ -763,6 +750,20 @@ class PandaRobot:
             if np.max(np.abs(delta_ee_pose)) < lowest_error:
                 best_solution = delta_theta
                 lowest_error = np.max(np.abs(delta_ee_pose))
+
+
+            if np.max(np.abs(delta_ee_pose)) <= atol:
+                joint_config = (current_joint_angles).flatten().tolist()
+                if joint_config[-1] != 0:
+                    print("WARNING: joint config of fixed joint not 0")
+                joint_config = joint_config[0:-1]
+                return joint_config, errors, adjustment_mag
+            elif iteration > max_iter:
+                joint_config = (q_init.T + best_solution).flatten().tolist()
+                if joint_config[-1] != 0:
+                    print("WARNING: joint config of fixed joint not 0")
+                joint_config = joint_config[0:-1]
+                return joint_config, errors, adjustment_mag
 
             iteration += 1
 

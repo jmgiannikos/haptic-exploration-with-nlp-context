@@ -35,7 +35,7 @@ sphere:
   global_scaling: 0.03
 
 ico_sphere:
-  urdf_path: "/home/jan-malte/Bachelors Thesis/simulation/haptic-exploration-with-nlp-context/objects/simple_shapes/ico_sphere1.urdf"
+  urdf_path: "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/objects/simple_shapes/ico_sphere1.urdf"
   base_position: [0.50, 0, 0.025]
   global_scaling: 0.03
 

@@ -28,14 +28,14 @@ OBJECT_RESET = True
 # 1: semi random
 # 2: semi structured
 # 3: structured
-COLLECTION_MODE = 3
+COLLECTION_MODE = 1
 GRID_NODE_NUM = 5
 ROT_STEP_WIDTH = 45 # 360 needs to be divisible by this number
 GLOBAL_VERBOSE = False
 GLOBAL_DATA_DICT = {}
 FILE_PATH = "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/"
-FILE_NAME = "grasp_cylinder_structured"
-TARGET_ITERATIONS = 750
+FILE_NAME = "grasp"
+TARGET_ITERATIONS = 50000
 REAL_TIME = False
 RENDER_DIGITS = False
 GLOBAL_TRACE_ITER = None #how regularly we want to collect trace data during move to grasp position and grasp, only works outside of real time mode
@@ -327,10 +327,10 @@ def calculate_object_box(object_geometry, global_scaling):
     
     return width*global_scaling, depth*global_scaling, height*global_scaling
 
-def check_lift_success(lift_height, resting_z, obj):
+def check_lift_success(lift_height, resting_z, obj, success_threshhold=0.8):
     current_pos, _ = obj.get_base_pose()
     delta_z = current_pos[2] - resting_z
-    if np.round(delta_z - lift_height, 2) == 0:
+    if delta_z > success_threshhold * lift_height:
         return True
     else: 
         return False
@@ -354,30 +354,39 @@ def fit_arrays(data_array, append_array):
     return np.append(data_array, append_array, 0)
   
 
-def add_to_global_data(current_data_dict):
-    if len(GLOBAL_DATA_DICT.keys()) < len(current_data_dict.keys()): # if the current local data has "undiscovered" keys
+def add_to_global_data(current_data_dict, global_data_dict):
+    if len(global_data_dict.keys()) < len(current_data_dict.keys()): # if the current local data has "undiscovered" keys
         for key in current_data_dict.keys():
-                GLOBAL_DATA_DICT[key] = [current_data_dict[key]]
+                global_data_dict[key] = [current_data_dict[key]]
     else:
         for key in current_data_dict.keys():
-                GLOBAL_DATA_DICT[key] = fit_arrays(GLOBAL_DATA_DICT[key], [current_data_dict[key]])
+                global_data_dict[key] = fit_arrays(global_data_dict[key], [current_data_dict[key]])
 
-def save_global_data_dict(iterator=1, iterator_max=10):
+def save_global_data_dict(global_data_dict, iterator=1, iterator_max=100, object_name="_object", file_name=FILE_NAME):
     if iterator == 1:
         iter_suffix = ""
     else:
         iter_suffix = str(iterator)
-        
-    path = FILE_PATH+FILE_NAME+iter_suffix+".npz"
+
+    if COLLECTION_MODE == 0:
+        file_name = file_name + object_name + "_random"
+    elif COLLECTION_MODE==1:
+        file_name = file_name + object_name + "_semi_random"
+    elif COLLECTION_MODE==2:
+        file_name = file_name + object_name + "_semi_structured"
+    elif COLLECTION_MODE==3:
+        file_name = file_name + object_name + "_structured"
+ 
+    path = FILE_PATH+file_name+iter_suffix+".npz"
 
     if os.path.isfile(path):
         if iterator <= iterator_max:
             iterator+=1
-            save_global_data_dict(iterator)
+            save_global_data_dict(global_data_dict, iterator, object_name=object_name)
         else:
             raise Exception("could not create save file")
     else: 
-        np.savez(path, **GLOBAL_DATA_DICT)
+        np.savez(path, **global_data_dict)
 
 def object_out_of_workspace(object, workspace_bounds):
     object_pos, _ = object.get_base_pose()
@@ -390,164 +399,216 @@ def object_out_of_workspace(object, workspace_bounds):
 
     return out_of_bounds
 
+def get_num_saved_data(object_name, file_name=FILE_NAME):
+
+    num_saved_data = 0
+    i = 0
+    while True:
+        if i == 0:
+            iter_suffix = ""
+        else:
+            iter_suffix = str(i+1)
+
+        if COLLECTION_MODE == 0:
+            file_name = file_name + object_name + "_random"
+        elif COLLECTION_MODE==1:
+            file_name = file_name + object_name + "_semi_random"
+        elif COLLECTION_MODE==2:
+            file_name = file_name + object_name + "_semi_structured"
+        elif COLLECTION_MODE==3:
+            file_name = file_name + object_name + "_structured"
+    
+        path = FILE_PATH+file_name+iter_suffix+".npz"
+
+        if os.path.isfile(path):
+            dataset = np.load(path)
+            num_saved_data += len(dataset["lift_success"])
+        else:
+            break
+
+        i += 1
+
+    return num_saved_data
+
+
 @hydra.main(config_name="conf")
 def main(cfg):
-    grasp_obj = cfg.cylinder
-    """"""
-    trajectory = True
-    px.init() # initialize pybulletX wrapper
+    objects = {
+        "ico_sphere": cfg.ico_sphere,
+        "cylinder": cfg.cylinder,
+        "sphere": cfg.sphere,
+        "cube": cfg.cube,
+        "block": cfg.block,
+        "cone": cfg.cone,
+    }
 
-    # Setup plane
-    p.setAdditionalSearchPath(pybullet_data.getDataPath())
-    plane_id = p.loadURDF("plane.urdf")
+    global_data_dict = {}
 
-    #p.resetDebugVisualizerCamera(**cfg.pybullet_camera)
+    for key in objects.keys():
+        grasp_obj = objects[key]
+        """"""
+        trajectory = True
+        px.init() # initialize pybulletX wrapper
 
-    # Setup robot
-    panda_robot = PandaRobot(include_gripper=INCLUDE_GRIPPER)
+        # Setup plane
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        plane_id = p.loadURDF("plane.urdf")
 
-    finger_joint_names = [b'joint_finger_tip_left', b'joint_finger_tip_right']
-    digit_links = []
-    for idx in range(0,p.getNumJoints(panda_robot.robot_id)):
-        if p.getJointInfo(panda_robot.robot_id, idx)[1] in finger_joint_names:
-            digit_links.append(idx)
+        #p.resetDebugVisualizerCamera(**cfg.pybullet_camera)
 
-    #setup tacto
-    digits = tacto.Sensor(**cfg.tacto)
-    
-    digits.add_camera(panda_robot.robot_id, digit_links) #doesnt add cameras properly?
+        # Setup robot
+        panda_robot = PandaRobot(include_gripper=INCLUDE_GRIPPER)
 
-    panda_robot.digits = digits
+        finger_joint_names = [b'joint_finger_tip_left', b'joint_finger_tip_right']
+        digit_links = []
+        for idx in range(0,p.getNumJoints(panda_robot.robot_id)):
+            if p.getJointInfo(panda_robot.robot_id, idx)[1] in finger_joint_names:
+                digit_links.append(idx)
 
-    #setup object
-    obj = px.Body(**grasp_obj)
-    object_geometry = load_geometry_from_cfg(grasp_obj)
-    global_scaling = grasp_obj.global_scaling
-    digits.add_body(obj)
-
-    #run pybulletX in diffeerent thread from pybullet
-    if REAL_TIME:
-        t = px.utils.SimulationThread(real_time_factor=1)
-        t.start()
-    else:
-        panda_robot.global_clock = False
-
-    for joint_idx in panda_robot.joints:
-        print(panda_robot.get_joint_info(joint_idx))
-
-    # set friction on robot and object 
-    friction_value = 5000
-    p.changeDynamics(bodyUniqueId=panda_robot.robot_id, linkIndex=8, lateralFriction=friction_value)
-    p.changeDynamics(bodyUniqueId=panda_robot.robot_id, linkIndex=10, lateralFriction=friction_value)
-    p.changeDynamics(bodyUniqueId=obj._id, linkIndex=0, lateralFriction=friction_value)
-
-    # initialize axsimg to show digits output
-    if RENDER_DIGITS:
-        axsimg = render_digits(digits)
-
-    rot_idx = 0
-    pos_idx = 0
-    iteration = 0
-    start_time = time.time()
-    while(iteration < TARGET_ITERATIONS):
-        # CONVENTION: all non-trajectory data is saved in a one dimensional array at most, trajectory-data is saved in two dimensional arrays
-        current_data_dict = {}
-        # tacto reads
-        color, depth = digits.render() # TODO: check how this works, might not be enough queries
-        #digits.updateGUI(color, depth)
-
-        panda_robot.reset_state()
-
-        if OBJECT_RESET:
-            obj.set_base_pose(grasp_obj.base_position)
-        else:    
-            wait_for_resting_object(obj)
-            if object_out_of_workspace(obj, panda_robot.workspace_bounds): #reset object if it fell out of workspace
-                obj.set_base_pose(grasp_obj.base_position)
-
-        # give simulation a chance to resolve clipping if it occured in reset
-        if not REAL_TIME:
-            for _ in range(0,5):
-                p.stepSimulation()
-        else:
-            time.sleep(5*p.getPhysicsEngineParameters()["fixedTimeStep"])
-
-        if RENDER_DIGITS:
-            render_digits(digits, axsimg=axsimg)
-
-        # GRASP POINT CALCULATION
-        base_pos, base_ori = obj.get_base_pose()
-        if COLLECTION_MODE == 1: # random selection of point restricted to within the object, random orientation
-            pos, rot, _ = calculate_grasp_candidate(panda_robot, base_pos, base_ori, object_geometry, global_scaling)
-        elif COLLECTION_MODE == 2: # random selection of point, then try all claw rotations
-            structured_conf = {"orientation": rot_idx%180}
-            if rot_idx%180 == 0:
-                pos, rot, idx_conf = calculate_grasp_candidate(panda_robot, base_pos, base_ori, object_geometry, global_scaling, structure_config=structured_conf)
-            else:
-                structured_conf["position"] = pos # hold the same position until full rotation was completed
-                pos, rot, idx_conf = calculate_grasp_candidate(panda_robot, base_pos, base_ori, object_geometry, global_scaling, structure_config=structured_conf)
-            rot_idx = idx_conf["ori_idx"]
-        elif COLLECTION_MODE == 3: # fully structured
-            if rot_idx%180 == 0:
-                structured_conf = {"orientation": rot_idx%180, "pos_idx": pos_idx} # move to next position
-                pos, rot, idx_conf = calculate_grasp_candidate(panda_robot, base_pos, base_ori, object_geometry, global_scaling, structure_config=structured_conf)
-                pos_idx = idx_conf["pos_idx"]
-                rot_idx = idx_conf["ori_idx"]
-            else:
-                structured_conf = {"orientation": rot_idx%180, "position": pos} # hold position and rotate
-                pos, rot, idx_conf = calculate_grasp_candidate(panda_robot, base_pos, base_ori, object_geometry, global_scaling, structure_config=structured_conf)
-                rot_idx = idx_conf["ori_idx"]
-
-        # MOVEMENT EXECUTION
-        object_box_width, object_box_depth, object_box_height = calculate_object_box(object_geometry, global_scaling)
-        object_box = [object_box_width, 0, object_box_depth, 0, object_box_height, 0]
+        #setup tacto
+        digits = tacto.Sensor(**cfg.tacto)
         
-        if trajectory:
-            grasped_pos = panda_robot.grasp_and_lift(pos, rot, obj, object_box, buffer=0.1, distance=LIFT_DIST, verbose=GLOBAL_VERBOSE, data_dict=current_data_dict, target_velocity=0.1, top_grasp=True, trace_iter=GLOBAL_TRACE_ITER, torque_limit=100)
+        digits.add_camera(panda_robot.robot_id, digit_links) #doesnt add cameras properly?
+
+        panda_robot.digits = digits
+
+        #setup object
+        obj = px.Body(**grasp_obj)
+        object_geometry = load_geometry_from_cfg(grasp_obj)
+        global_scaling = grasp_obj.global_scaling
+        digits.add_body(obj)
+
+        #run pybulletX in diffeerent thread from pybullet
+        if REAL_TIME:
+            t = px.utils.SimulationThread(real_time_factor=1)
+            t.start()
         else:
-            #TODO: implement grasp_and_lift_alt to allow non-trajectory grasping
-            gripper_pos, success = panda_robot.calculate_inverse_kinematics(pos, rot, verbose=GLOBAL_VERBOSE)
+            panda_robot.global_clock = False
 
-            panda_robot.grasp_at(gripper_pos, max_velocity=1, verbose=GLOBAL_VERBOSE, data_dict=current_data_dict)
-            grasped_pos, _ = obj.get_base_pose()
-            panda_robot.lift(distance=LIFT_DIST, verbose=GLOBAL_VERBOSE, obj=obj, data_dict=current_data_dict, object_box=object_box)
+        for joint_idx in panda_robot.joints:
+            print(panda_robot.get_joint_info(joint_idx))
 
-        # LIFT SUCCESS CHECK
-        if grasped_pos is not None:
-            lift_success = check_lift_success(lift_height=LIFT_DIST, resting_z=grasped_pos[2], obj=obj)
-            
-            if GLOBAL_VERBOSE:
-                if lift_success:
-                    print("LIFTED SUCCESSFULLY")
+        # set friction on robot and object 
+        friction_value = 5000
+        p.changeDynamics(bodyUniqueId=panda_robot.robot_id, linkIndex=8, lateralFriction=friction_value)
+        p.changeDynamics(bodyUniqueId=panda_robot.robot_id, linkIndex=10, lateralFriction=friction_value)
+        p.changeDynamics(bodyUniqueId=obj._id, linkIndex=0, lateralFriction=friction_value)
+
+        # initialize axsimg to show digits output
+        if RENDER_DIGITS:
+            axsimg = render_digits(digits)
+
+        rot_idx = 0
+        pos_idx = 0
+        iteration = get_num_saved_data(object_name="_" + key)
+        start_time = time.time()
+        while(iteration < TARGET_ITERATIONS):
+            # CONVENTION: all non-trajectory data is saved in a one dimensional array at most, trajectory-data is saved in two dimensional arrays
+            current_data_dict = {}
+            # tacto reads
+            # color, depth = digits.render() # TODO: check how this works, might not be enough queries
+            #digits.updateGUI(color, depth)
+
+            panda_robot.reset_state()
+
+            if OBJECT_RESET:
+                obj.set_base_pose(grasp_obj.base_position)
+            else:    
+                wait_for_resting_object(obj)
+                if object_out_of_workspace(obj, panda_robot.workspace_bounds): #reset object if it fell out of workspace
+                    obj.set_base_pose(grasp_obj.base_position)
+
+            # give simulation a chance to resolve clipping if it occured in reset
+            if not REAL_TIME:
+                for _ in range(0,5):
+                    p.stepSimulation()
+            else:
+                time.sleep(5*p.getPhysicsEngineParameters()["fixedTimeStep"])
+
+            if RENDER_DIGITS:
+                render_digits(digits, axsimg=axsimg)
+
+            # GRASP POINT CALCULATION
+            base_pos, base_ori = obj.get_base_pose()
+            if COLLECTION_MODE == 1: # random selection of point restricted to within the object, random orientation
+                pos, rot, _ = calculate_grasp_candidate(panda_robot, base_pos, base_ori, object_geometry, global_scaling)
+            elif COLLECTION_MODE == 2: # random selection of point, then try all claw rotations
+                structured_conf = {"orientation": rot_idx%180}
+                if rot_idx%180 == 0:
+                    pos, rot, idx_conf = calculate_grasp_candidate(panda_robot, base_pos, base_ori, object_geometry, global_scaling, structure_config=structured_conf)
                 else:
-                    print("LIFT FAILED")
+                    structured_conf["position"] = pos # hold the same position until full rotation was completed
+                    pos, rot, idx_conf = calculate_grasp_candidate(panda_robot, base_pos, base_ori, object_geometry, global_scaling, structure_config=structured_conf)
+                rot_idx = idx_conf["ori_idx"]
+            elif COLLECTION_MODE == 3: # fully structured
+                if rot_idx%180 == 0:
+                    structured_conf = {"orientation": rot_idx%180, "pos_idx": pos_idx} # move to next position
+                    pos, rot, idx_conf = calculate_grasp_candidate(panda_robot, base_pos, base_ori, object_geometry, global_scaling, structure_config=structured_conf)
+                    pos_idx = idx_conf["pos_idx"]
+                    rot_idx = idx_conf["ori_idx"]
+                else:
+                    structured_conf = {"orientation": rot_idx%180, "position": pos} # hold position and rotate
+                    pos, rot, idx_conf = calculate_grasp_candidate(panda_robot, base_pos, base_ori, object_geometry, global_scaling, structure_config=structured_conf)
+                    rot_idx = idx_conf["ori_idx"]
 
-            current_data_dict["lift_success"] = lift_success
+            # MOVEMENT EXECUTION
+            object_box_width, object_box_depth, object_box_height = calculate_object_box(object_geometry, global_scaling)
+            object_box = [object_box_width, 0, object_box_depth, 0, object_box_height, 0]
             
-            size = np_arra_dict_getsize(current_data_dict)
-            print(f"the current data dictionary is {size*10e-9}GB big")
+            if trajectory:
+                grasped_pos = panda_robot.grasp_and_lift(pos, rot, obj, object_box, buffer=0.1, distance=LIFT_DIST, verbose=GLOBAL_VERBOSE, data_dict=current_data_dict, target_velocity=0.1, top_grasp=True, trace_iter=GLOBAL_TRACE_ITER, torque_limit=100)
+            else:
+                #TODO: implement grasp_and_lift_alt to allow non-trajectory grasping
+                gripper_pos, success = panda_robot.calculate_inverse_kinematics(pos, rot, verbose=GLOBAL_VERBOSE)
 
-            add_to_global_data(current_data_dict)
+                panda_robot.grasp_at(gripper_pos, max_velocity=1, verbose=GLOBAL_VERBOSE, data_dict=current_data_dict)
+                grasped_pos, _ = obj.get_base_pose()
+                panda_robot.lift(distance=LIFT_DIST, verbose=GLOBAL_VERBOSE, obj=obj, data_dict=current_data_dict, object_box=object_box)
 
-            size = np_arra_dict_getsize(GLOBAL_DATA_DICT)
-            print(f"the global data dictionary is {size*10e-9}GB big")
+            # LIFT SUCCESS CHECK
+            if grasped_pos is not None:
+                lift_success = check_lift_success(lift_height=LIFT_DIST, resting_z=grasped_pos[2], obj=obj)
+                
+                if GLOBAL_VERBOSE:
+                    if lift_success:
+                        print("LIFTED SUCCESSFULLY")
+                    else:
+                        print("LIFT FAILED")
 
-        #TODO: Data saving functionality
-        # pre/post object pose (DONE)
-        # object-relative grasp pose (local grasp) (DONE, implicit in joint configs)
-        # haptic feedback (after grasp) (DONE)
-        # lift success (DONE)
+                current_data_dict["lift_success"] = lift_success
+                
+                size = np_arra_dict_getsize(current_data_dict)
+                print(f"the current data dictionary is {size*10e-9}GB big")
 
-        iteration += 1
-        panda_robot.reset_state()
-    
-    stop_time = time.time()
-    time_needed = (stop_time - start_time)/60
-    total_valid_lifts = len(GLOBAL_DATA_DICT["lift_success"])
-    grasps_per_minute = total_valid_lifts/time_needed 
-    print(f"generated {total_valid_lifts} in {time_needed} minutes. Thats {grasps_per_minute} grasps per minute")
+                add_to_global_data(current_data_dict, global_data_dict)
 
-    save_global_data_dict()
+                size = np_arra_dict_getsize(global_data_dict)
+                print(f"the global data dictionary is {size*10e-9}GB big")
+
+                if size*10e-9 > 2:
+                    save_global_data_dict(global_data_dict, object_name="_" + key)
+                    print(iteration)
+                    global_data_dict = {}
+
+
+
+            #TODO: Data saving functionality
+            # pre/post object pose (DONE)
+            # object-relative grasp pose (local grasp) (DONE, implicit in joint configs)
+            # haptic feedback (after grasp) (DONE)
+            # lift success (DONE)
+
+            iteration += 1
+            panda_robot.reset_state()
+        
+        stop_time = time.time()
+        time_needed = (stop_time - start_time)/60
+        total_valid_lifts = len(global_data_dict["lift_success"])
+        grasps_per_minute = total_valid_lifts/time_needed 
+        print(f"generated {total_valid_lifts} in {time_needed} minutes. Thats {grasps_per_minute} grasps per minute")
+
+        obj_name = "_" + key
+        save_global_data_dict(global_data_dict, object_name=obj_name)
 
 if __name__ == '__main__':
     main()
