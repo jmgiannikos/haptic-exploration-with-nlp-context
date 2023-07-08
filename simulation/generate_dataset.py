@@ -434,12 +434,12 @@ def get_num_saved_data(object_name, file_name=FILE_NAME):
 @hydra.main(config_name="conf")
 def main(cfg):
     objects = {
-        "ico_sphere": cfg.ico_sphere,
-        "cylinder": cfg.cylinder,
-        "sphere": cfg.sphere,
         "cube": cfg.cube,
+        "ico_sphere": cfg.ico_sphere,
         "block": cfg.block,
         "cone": cfg.cone,
+        "cylinder": cfg.cylinder,
+        "sphere": cfg.sphere,
     }
 
     global_data_dict = {}

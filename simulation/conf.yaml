@@ -21,7 +21,7 @@ cube:
 
 cylinder:
   urdf_path: "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/objects/simple_shapes/cylinder1.urdf"
-  base_position: [0.50, 0, 0.05]
+  base_position: [0.50, 0, 0.025]
   global_scaling: 0.03
 
 cone:
