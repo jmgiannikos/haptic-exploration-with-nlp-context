@@ -436,10 +436,10 @@ def main(cfg):
     objects = {
         "cube": cfg.cube,
         "ico_sphere": cfg.ico_sphere,
-        "block": cfg.block,
-        "cone": cfg.cone,
         "cylinder": cfg.cylinder,
         "sphere": cfg.sphere,
+        "block": cfg.block,
+        "cone": cfg.cone,
     }
 
     global_data_dict = {}

@@ -12,19 +12,24 @@ import os
 import random
 import matplotlib.pyplot as plt
 from sklearn.metrics import PrecisionRecallDisplay
+import wandb
+from datetime import datetime
 
 NUM_EPOCHS = 4
 VERBOSE = False
 PIXEL_REDUCTION_FACTOR = 2
 CURRENT_DEVICE = "drax"
-PATH = {"laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/",
-        "drax": "/home/jan-malte/haptic-exploration-with-nlp-context/simulation/grasp_block_semi_random/"}
-FILE_NAME = "grasp_block_semi_random"
+PATH = {"laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/",
+        "drax": "/home/jan-malte/haptic-exploration-with-nlp-context/simulation/"}
+DATA_DIRECTORY = {"laptop": "grasp_datasets/",
+        "drax": "grasp_block_semi_random/"}
 NO_CROSSVAL = True
 MODEL_PATH = {"laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/block training model snapshots/_model_snapshot_70",
               "drax": "/home/jan-malte/haptic-exploration-with-nlp-context/simulation/_model_snapshot_70"}
-EVAL_SET = {"laptop":"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/grasp_block_semi_random.npz",
-            "drax":"/home/jan-malte/haptic-exploration-with-nlp-context/simulation/grasp_block_semi_random/grasp_block_semi_random.npz"}
+
+# the appropriate val file paths should be saved in wandb run and easily retrievable. Have to be set before eval
+VAL_FILE_PATHS = {"laptop":"",
+            "drax":""}
 TRAIN = True
 NUM_FOLDS = 10
 
@@ -67,61 +72,74 @@ class Depth_Grasp_Alex_Classifier(nn.Module):
 class Depth_Grasp_Classifier_v2(nn.Module):
     def __init__(self):
         super().__init__()
-        # 2 input channels on first conv layer to accomodate input from both fingers
-        self.conv1 = nn.Conv2d(2, 64, kernel_size=11, stride=2, padding=2)
-        self.conv2 = nn.Conv2d(64, 192, kernel_size=5, padding=1)
-        self.conv3 = nn.Conv2d(192, 48, kernel_size=3, padding=1)
+        self.cnn_feature_extract = nn.Sequential(
+            nn.Conv2d(2, 64, kernel_size=11, stride=2, padding=2),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(64, 192, kernel_size=5, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(192, 48, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
 
-        self.pool = nn.MaxPool2d(3, 2)
-        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
+        self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
 
-        self.fc1 = nn.Linear(1728, 864)
-        self.fc2 = nn.Linear(864, 2)
-        self.logsoftmax = torch.nn.LogSoftmax(1)
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=0.5),
+            nn.Linear(1728, 864),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(864, 2),
+            torch.nn.LogSoftmax(1)
+        )
 
-        self.dropout1 = nn.Dropout(p=0.5)
-        self.dropout2 = nn.Dropout(p=0.5)
         self.name = "v2"
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
-        x = self.avgpool(x)
-        x = self.dropout1(torch.flatten(x, 1)) # flatten all dimensions except batch
-        x = self.dropout1(F.relu(self.fc1(x)))
-        x = self.logsoftmax(self.fc2(x))
+        x = self.cnn_feature_extract(x)
+        x = self.avg_pool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
         return x
 
 # neural network that classifiers wether or not the grasp was successful based on the depth image
 class Depth_Grasp_Classifier(nn.Module):
     def __init__(self):
         super().__init__()
-        # 2 input channels on first conv layer to accomodate input from both fingers
-        self.conv1 = nn.Conv2d(2, 64, kernel_size=11, stride=2, padding=2)
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, padding=2)
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
-        self.conv4 = nn.Conv2d(256, 128, kernel_size=2, padding=1)
+        self.cnn_feature_extract = nn.Sequential(
+            nn.Conv2d(2, 64, kernel_size=11, stride=2, padding=2),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(64, 128, kernel_size=5, padding=2),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(256, 128, kernel_size=2, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
 
-        self.pool = nn.MaxPool2d(3, 2)
         self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
 
-        self.fc1 = nn.Linear(4608, 4608)
-        self.fc2 = nn.Linear(4608, 4608)
-        self.fc3 = nn.Linear(4608, 2)
-        self.logsoftmax = torch.nn.LogSoftmax(1)
+        self.classifier = nn.Sequential(
+            nn.Linear(4608, 4608),
+            nn.ReLU(),
+            nn.Linear(4608, 4608),
+            nn.ReLU(),
+            nn.Linear(4608, 2),
+            torch.nn.LogSoftmax(1)
+        )
         self.name = "v1"
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
-        x = self.pool(F.relu(self.conv4(x)))
+        x = self.cnn_feature_extract(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1) # flatten all dimensions except batch
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.logsoftmax(self.fc3(x))
+        x = self.classifier(x)
         return x
     
 class depth_dataset(Dataset):
@@ -287,86 +305,97 @@ def reduce_depth_image_fidelity(depth_images, reduction_factor_x=2, reduction_fa
 
     return pooled_depth_images
 
-def validate_classifier(model, val_loader, result_dict, show_misclassified=True, fold=-1, num=-1):
-    pred_labels = []
-    gt_labels = []
-    pred_pos_probabilities = []
-    j = 0
-    for data in val_loader:
-        inputs, label = data
-        gt_labels.append(label.detach().numpy()[0])
-        prediction = model(inputs)
-        prediction = prune_dimensions(prediction.detach().numpy())
-        prediction = np.exp(prediction)
+def validate_classifier(model, val_files, result_dict, show_misclassified=True, fold=-1, save_figure=True, results_path=""):
+    tmp_val_dict = {}
+    for val_iter, val_file_name in enumerate(val_files):
+        val_data, val_labels = load_depth_dataset(dataset_path=val_file_name)
+        val_data = prune_dimensions(val_data)
+        val_labels = prune_dimensions(val_labels)
+        val_loader = dataset_to_data_loader(dataset=(val_data, val_labels))
 
-        pred_pos_probability = prediction[1]
+        pred_labels = []
+        gt_labels = []
+        pred_pos_probabilities = []
+        j = 0
+        for data in val_loader:
+            inputs, label = data
+            gt_labels.append(label.detach().numpy()[0])
+            prediction = model(inputs)
+            prediction = prune_dimensions(prediction.detach().numpy())
+            prediction = np.exp(prediction)
 
-        pred_pos_probabilities.append(pred_pos_probability)
+            pred_pos_probability = prediction[1]
 
-        max_pred = -float("inf")
-        max_pred_idx = None
-        i = 0
-        for pred in prediction:
-            if pred > max_pred:
-                max_pred = pred
-                max_pred_idx = i
-            i += 1
+            pred_pos_probabilities.append(pred_pos_probability)
 
-        if VERBOSE:
-            if j <= 10:
-                print("predicted positive probability:" + str(pred_pos_probability))
-                print("pred label:" + str(max_pred_idx))
-                print("gt label:" + str(label.item()))
-                render_depth(inputs)
-                j += 1
+            max_pred = -float("inf")
+            max_pred_idx = None
+            i = 0
+            for pred in prediction:
+                if pred > max_pred:
+                    max_pred = pred
+                    max_pred_idx = i
+                i += 1
 
-            if show_misclassified and max_pred_idx != label.item():
-                print("### misclassification ###")
-                print("predicted positive probability:" + str(pred_pos_probability))
-                print("pred label:" + str(max_pred_idx))
-                print("gt label:" + str(label.item()))
-                render_depth(inputs)
+            if VERBOSE:
+                if j <= 10:
+                    print("predicted positive probability:" + str(pred_pos_probability))
+                    print("pred label:" + str(max_pred_idx))
+                    print("gt label:" + str(label.item()))
+                    render_depth(inputs)
+                    j += 1
 
-        pred_labels.append(max_pred_idx)
+                if show_misclassified and max_pred_idx != label.item():
+                    print("### misclassification ###")
+                    print("predicted positive probability:" + str(pred_pos_probability))
+                    print("pred label:" + str(max_pred_idx))
+                    print("gt label:" + str(label.item()))
+                    render_depth(inputs)
 
-    display = PrecisionRecallDisplay.from_predictions(y_true=gt_labels, y_pred=pred_pos_probabilities)
-    plt.savefig(PATH[CURRENT_DEVICE]+"precision_recall_curve_fold_"+str(fold)+"_num_"+str(num))
-    if VERBOSE:
-        plt.show(block=True)
+            pred_labels.append(max_pred_idx)
 
-    true_positives = 0
-    false_positives = 0
-    false_negatives = 0
-    true_negatives = 0
-    for idx, data in enumerate(val_loader, 0):
-        _, label = data
-        if label == 1:
-            if pred_labels[idx] == 1:
-                true_positives += 1
-            elif pred_labels[idx] == 0:
-                false_negatives += 1
-        elif label == 0:
-            if pred_labels[idx] == 1:
-                false_positives += 1
-            if pred_labels[idx] == 0:
-                true_negatives += 1
+        if save_figure:
+            display = PrecisionRecallDisplay.from_predictions(y_true=gt_labels, y_pred=pred_pos_probabilities)
+            plt.savefig(results_path+"precision_recall_curve_fold_"+str(fold)+"_num_"+str(val_iter))
+            if VERBOSE:
+                plt.show(block=True)
 
-    if true_positives+false_positives > 0:
-        precision = true_positives/(true_positives+false_positives)
-    else:
-        precision = 0
+        true_positives = 0
+        false_positives = 0
+        false_negatives = 0
+        true_negatives = 0
+        for idx, data in enumerate(val_loader, 0):
+            _, label = data
+            if label == 1:
+                if pred_labels[idx] == 1:
+                    true_positives += 1
+                elif pred_labels[idx] == 0:
+                    false_negatives += 1
+            elif label == 0:
+                if pred_labels[idx] == 1:
+                    false_positives += 1
+                if pred_labels[idx] == 0:
+                    true_negatives += 1
 
-    if true_positives+false_negatives > 0:
-        recall = true_positives/(true_positives+false_negatives)
-    else:
-        recall = 0
+        if true_positives+false_positives > 0:
+            precision = true_positives/(true_positives+false_positives)
+        else:
+            precision = 0
 
-    dict_list_append("precision", precision, result_dict)
-    dict_list_append("recall", recall, result_dict)
-    dict_list_append("tp", true_positives, result_dict)
-    dict_list_append("tn", true_negatives, result_dict)
-    dict_list_append("fp", false_positives, result_dict)
-    dict_list_append("fn", false_negatives, result_dict)
+        if true_positives+false_negatives > 0:
+            recall = true_positives/(true_positives+false_negatives)
+        else:
+            recall = 0
+
+        dict_list_append("precision", precision, tmp_val_dict)
+        dict_list_append("recall", recall, tmp_val_dict)
+        dict_list_append("tp", true_positives, tmp_val_dict)
+        dict_list_append("tn", true_negatives, tmp_val_dict)
+        dict_list_append("fp", false_positives, tmp_val_dict)
+        dict_list_append("fn", false_negatives, tmp_val_dict)
+
+    stack_validation_averages(result_dict, tmp_val_dict) # collapse temporary entries and add them to global results
+
 
 def dict_list_append(key, val, target_dict):
     if key in target_dict.keys():
@@ -374,26 +403,14 @@ def dict_list_append(key, val, target_dict):
     else:
         target_dict[key] = [val]
 
-def get_dataset_paths(dataset_path_base):
-    dataset_paths = []
-    i = 1
-    while True:
-        if i == 1:
-            file_suffix = ""    
-            path = dataset_path_base + file_suffix + ".npz"
+def ends_in_npz(filename):
+    split_name = filename.split(".")
+    return "npz" == split_name[-1]
 
-        else:
-            file_suffix = str(i)
-        
-            path = dataset_path_base + file_suffix + ".npz"
-
-        if os.path.isfile(path):
-            dataset_paths.append(path)
-        else:
-            break
-
-        i += 1
-
+# loads all npz files in given folder
+def get_dataset_paths(dataset_folder_path):
+    files_list = os.listdir(dataset_folder_path)
+    dataset_paths = [dataset_folder_path + filename for filename in files_list if ends_in_npz(filename)]
     return dataset_paths
 
 def prune_dimensions(array):
@@ -425,14 +442,15 @@ def stack_validation_averages(val_dict, tmp_val_dict):
     dict_list_append(key, value, val_dict)
     
 
-def train_test_depth_pipeline(dataset_path=""):
+def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""):
+    learning_rate = 0.0001
     depth_grasp_classifier = Depth_Grasp_Classifier_v2()
     nll_weights = torch.tensor([0.142,1.0])
     criterion = nn.NLLLoss(weight=nll_weights)
-    optimizer = optim.SGD(depth_grasp_classifier.parameters(), lr=0.0001)
+    optimizer = optim.SGD(depth_grasp_classifier.parameters(), lr=learning_rate)
 
     dataset_paths = get_dataset_paths(dataset_path)
-    #random.shuffle(dataset_paths)
+    random.shuffle(dataset_paths)
 
     loss_vals_gtf = []
     loss_vals_gtt = []
@@ -441,21 +459,47 @@ def train_test_depth_pipeline(dataset_path=""):
     snapshot_count = 0
     plot_count = 1
     for fold in range(NUM_FOLDS):
+        current_best_f1 = 0
         val_files, train_files = split_file_list(dataset_paths, NUM_FOLDS, fold)
+
+        config={
+            "optimizer type": type(optimizer),
+            "loss type": type(criterion),
+            "learning_rate": learning_rate,
+            "model": depth_grasp_classifier.name,
+            "training datasets": train_files,
+            "validation datasets": val_files,
+            "epochs": NUM_EPOCHS,
+            "crossval fold": fold,
+            "total folds": NUM_FOLDS,
+            "pixel reduction factor": PIXEL_REDUCTION_FACTOR,
+            "start time and date": dnt_start
+        }
+
+        if isinstance(criterion, nn.NLLLoss):
+            config["NLL weights"]: nll_weights
+
+        wandb.init(
+            # set the wandb project where this run will be logged
+            project="haptic-exploration-with-nlp",
+            # track hyperparameters and run metadata
+            config=config
+        )
 
         print(f"###### fold: {fold} ######")
 
-        for train_file_name in train_files:
-            print(f"--- {train_file_name} ---")
-            train_data, train_labels = load_depth_dataset(dataset_path=train_file_name)
-            
-            train_data = prune_dimensions(train_data)
-            train_labels = prune_dimensions(train_labels)
+        for epoch in range(NUM_EPOCHS):
+            for file_idx, train_file_name in enumerate(train_files):
+                print(f"--- {train_file_name} ---")
+                train_data, train_labels = load_depth_dataset(dataset_path=train_file_name)
+                
+                train_data = prune_dimensions(train_data)
+                train_labels = prune_dimensions(train_labels)
 
-            train_loader = dataset_to_data_loader(dataset=(train_data, train_labels), batch_size=1)
+                train_loader = dataset_to_data_loader(dataset=(train_data, train_labels), batch_size=1)
 
-            running_loss = 0
-            for epoch in range(NUM_EPOCHS):
+                running_loss = 0
+                
                 for i, datapoint in enumerate(train_loader, 0):
                     inputs, label = datapoint
 
@@ -477,37 +521,53 @@ def train_test_depth_pipeline(dataset_path=""):
                     
                     if label.item() == 0:
                         loss_vals_gtf.append(current_loss)
+                        wandb.log({"ground truth negative loss": current_loss})
                     else:
                         loss_vals_gtt.append(current_loss)
+                        wandb.log({"ground truth positive loss": current_loss})
 
                     if i % 100 == 99: 
                         average_loss.append(running_loss/100)
+                        wandb.log({"average overall loss in the last 100 steps": running_loss/100})
                         running_loss = 0
                     #running_loss = 0.0
+
+                if file_idx % 10: # every 10 files: make a snapshot that is permanent
+                    torch.save(depth_grasp_classifier, results_path+depth_grasp_classifier.name+"_model_snapshot_"+str(snapshot_count)+"_fold_"+str(fold))
+                    snapshot_count += 1
+                else: # otherwise make a snapshot that is temporary in case of crash
+                    torch.save(depth_grasp_classifier, results_path+depth_grasp_classifier.name+"_model_snapshot_"+str(snapshot_count)+"_fold_"+str(fold))
             
-            torch.save(depth_grasp_classifier, PATH[CURRENT_DEVICE]+depth_grasp_classifier.name+"_model_snapshot_"+str(snapshot_count)+"_fold_"+str(fold))
-            snapshot_count += 1
+                # run validation after every "file batch"
+                intermediate_validation_results = {}
+                validate_classifier(depth_grasp_classifier, val_files, intermediate_validation_results, fold=fold, save_figure=False, results_path=results_path)
+                wandb.log(intermediate_validation_results)
 
-        fig, ax = plt.subplots(3)
-        ax[0].plot(loss_vals_gtf)
-        ax[1].plot(loss_vals_gtt)
-        ax[2].plot(average_loss)
-        plt.savefig(PATH[CURRENT_DEVICE]+"training_plot"+str(plot_count)+"_fold_"+str(fold))
-        plot_count += 1
-        if VERBOSE:
-            plt.show()
+                precision = intermediate_validation_results["precision"][0]
+                recall = intermediate_validation_results["recall"][0]
+                if precision == 0 and recall == 0:
+                    f1_score = 0
+                else:
+                    f1_score = 2*(precision*recall)/(precision+recall)
 
-        tmp_val_dict = {}
-        for val_iter, val_file_name in enumerate(val_files):
-            val_data, val_labels = load_depth_dataset(dataset_path=val_file_name)
-            val_data = prune_dimensions(val_data)
-            val_labels = prune_dimensions(val_labels)
-            val_loader = dataset_to_data_loader(dataset=(val_data, val_labels))
+                if f1_score > current_best_f1:
+                    torch.save(depth_grasp_classifier, results_path+depth_grasp_classifier.name+"_best_snapshot_"+str(snapshot_count)+"_fold_"+str(fold))
+                    current_best_f1 = f1_score
 
-            validate_classifier(depth_grasp_classifier, val_loader, tmp_val_dict, fold=fold, num=val_iter)
 
-        stack_validation_averages(validation_results, tmp_val_dict) # collapse temporary entries and add them to global results
+        # Redundant, covered by wandb
+        # fig, ax = plt.subplots(3)
+        # ax[0].plot(loss_vals_gtf)
+        # ax[1].plot(loss_vals_gtt)
+        # ax[2].plot(average_loss)
+        # plt.savefig(PATH[CURRENT_DEVICE]+"training_plot"+str(plot_count)+"_fold_"+str(fold))
+        # plot_count += 1
+        # if VERBOSE:
+        #    plt.show()
 
+        validate_classifier(depth_grasp_classifier, val_files, validation_results, fold=fold, results_path=results_path)
+
+        
         if NO_CROSSVAL:
             break
 
@@ -516,24 +576,29 @@ def train_test_depth_pipeline(dataset_path=""):
     print("average Precision:" + str(statistics.mean(validation_results["precision"])))
     print("average Recall:" + str(statistics.mean(validation_results["recall"])))
 
-def load_and_eval(model_path=MODEL_PATH[CURRENT_DEVICE], eval_set_path=EVAL_SET[CURRENT_DEVICE]):
+def load_and_eval(model_path=MODEL_PATH[CURRENT_DEVICE], val_file_paths=VAL_FILE_PATHS[CURRENT_DEVICE], results_path=""):
     validation_results = {}
     model = torch.load(model_path)
-    #model.load_state_dict(torch.load(model_path))
-    val_data, val_labels = load_depth_dataset(dataset_path=eval_set_path)
-    val_loader = dataset_to_data_loader(dataset=(val_data, val_labels))
-    validate_classifier(model, val_loader, validation_results)
+    validate_classifier(model, val_file_paths, validation_results, results_path=results_path)
     print(validation_results)
 
 
 def main():
+
+    now = datetime.now()
+    current_time_and_date = now.strftime("%m/%d/%y_%H:%M:%S")
+    results_folder_name = "results_run_" + current_time_and_date
+    path = os.path.join(PATH[CURRENT_DEVICE], results_folder_name)
+    results_folder_name = results_folder_name + "/"
+    os.mkdir(path)
+
     if TRAIN:
         try:
-            train_test_depth_pipeline(PATH[CURRENT_DEVICE] + FILE_NAME)
+            train_test_depth_pipeline(dataset_path=PATH[CURRENT_DEVICE]+DATA_DIRECTORY[CURRENT_DEVICE], dnt_start=current_time_and_date, results_path=PATH[CURRENT_DEVICE]+results_folder_name)
         except Exception as e:
             print(e)
     else:
-        load_and_eval()
+        load_and_eval(results_path=PATH[CURRENT_DEVICE]+results_folder_name)
 
 if __name__ == '__main__':
     main()
