@@ -14,16 +14,18 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import PrecisionRecallDisplay
 import wandb
 from datetime import datetime
+import clip
 
+BATCH_SIZE = 20
 NUM_EPOCHS = 4
 VERBOSE = False
 PIXEL_REDUCTION_FACTOR = 2
 CURRENT_DEVICE = "drax"
 PATH = {"laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/",
-        "drax": "/home/jan-malte/haptic-exploration-with-nlp-context/simulation/"}
+        "drax": "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/"}
 DATA_DIRECTORY = {"laptop": "grasp_datasets/",
-        "drax": "grasp_block_semi_random/"}
-NO_CROSSVAL = True
+        "drax": "mixed_object_dataset/"}
+NO_CROSSVAL = False
 MODEL_PATH = {"laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/block training model snapshots/_model_snapshot_70",
               "drax": "/home/jan-malte/haptic-exploration-with-nlp-context/simulation/_model_snapshot_70"}
 
@@ -32,6 +34,8 @@ VAL_FILE_PATHS = {"laptop":"",
             "drax":""}
 TRAIN = True
 NUM_FOLDS = 10
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+LANGUAGE_PROMPTS_PATH = "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/simple_nlp_prompts.npz"
 
 class Depth_Grasp_Alex_Classifier(nn.Module):
     def __init__(self, num_classes: int = 2, dropout: float = 0.5) -> None:
@@ -65,6 +69,151 @@ class Depth_Grasp_Alex_Classifier(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)
         x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
+
+class Depth_Grasp_Classifier_v3_norm(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cnn_feature_extract = nn.Sequential(
+            nn.Conv2d(2, 32, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 1),
+            nn.Conv2d(32, 576, kernel_size=9, stride=3, padding=0),
+            nn.BatchNorm2d(576),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(576, 144, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(144),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
+
+        self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=0.5),
+            nn.Linear(5184, 1296),
+            nn.BatchNorm1d(1296),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(1296, 2),
+            torch.nn.LogSoftmax(1)
+        )
+
+        self.name = "v3 batch norm"
+
+    def forward(self, x):
+        x = self.cnn_feature_extract(x)
+        x = self.avg_pool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
+
+class Depth_Grasp_Classifier_v3l(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cnn_feature_extract = nn.Sequential(
+            nn.Conv2d(2, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 1),
+            nn.Conv2d(32, 576, kernel_size=9, stride=3, padding=0),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(576, 144, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
+
+        self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=0.5),
+            nn.Linear(5696, 1296),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(1296, 2),
+            torch.nn.LogSoftmax(1)
+        )
+
+        self.name = "v3 language"
+
+    def forward(self, x, nlp_embedding):
+        x = self.cnn_feature_extract(x)
+        x = self.avg_pool(x)
+        x = torch.flatten(x, 1)
+        x = torch.cat((x,nlp_embedding),1)
+        x = self.classifier(x)
+        return x
+
+class Depth_Grasp_Classifier_v3(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cnn_feature_extract = nn.Sequential(
+            nn.Conv2d(2, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 1),
+            nn.Conv2d(32, 576, kernel_size=9, stride=3, padding=0),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(576, 144, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
+
+        self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=0.5),
+            nn.Linear(5184, 1296),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(1296, 2),
+            torch.nn.LogSoftmax(1)
+        )
+
+        self.name = "v3"
+
+    def forward(self, x):
+        x = self.cnn_feature_extract(x)
+        x = self.avg_pool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
+
+class Depth_Grasp_Classifier_v2_w(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cnn_feature_extract = nn.Sequential(
+            nn.Conv2d(2, 64, kernel_size=11, stride=2, padding=2),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(64, 192, kernel_size=5, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(192, 48, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
+
+        self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=0.5),
+            nn.Linear(1728, 864),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(864, 2),
+            torch.nn.LogSoftmax(1)
+        )
+
+        self.name = "v2"
+
+    def forward(self, x):
+        x = self.cnn_feature_extract(x)
+        x = self.avg_pool(x)
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         return x
@@ -251,7 +400,7 @@ def dataset_to_data_loader(dataset=None, data_path="", batch_size=1):
     return data_loader
 
 def load_depth_dataset(dataset_path="", normalize=True):
-    dataset = dataset=np.load(dataset_path)
+    dataset = np.load(dataset_path)
     if PIXEL_REDUCTION_FACTOR is None:
         data = dataset["tactile_depth"]
     else:
@@ -305,7 +454,7 @@ def reduce_depth_image_fidelity(depth_images, reduction_factor_x=2, reduction_fa
 
     return pooled_depth_images
 
-def validate_classifier(model, val_files, result_dict, show_misclassified=True, fold=-1, save_figure=True, results_path=""):
+def validate_classifier(model, val_files, result_dict, show_misclassified=True, fold=-1, save_figure=True, results_path="", nlp_prompts=None, clip_model = None):
     tmp_val_dict = {}
     for val_iter, val_file_name in enumerate(val_files):
         val_data, val_labels = load_depth_dataset(dataset_path=val_file_name)
@@ -317,11 +466,24 @@ def validate_classifier(model, val_files, result_dict, show_misclassified=True, 
         gt_labels = []
         pred_pos_probabilities = []
         j = 0
-        for data in val_loader:
+        true_positives = 0
+        false_positives = 0
+        false_negatives = 0
+        true_negatives = 0
+        object_type = val_file_name.split("/")[-1].split("_")[1]
+
+        for idx, data in enumerate(val_loader, 0):
             inputs, label = data
+            inputs = inputs.to(DEVICE)
             gt_labels.append(label.detach().numpy()[0])
-            prediction = model(inputs)
-            prediction = prune_dimensions(prediction.detach().numpy())
+
+            if nlp_prompts is not None:
+                nlp_embedding = get_language_embedding(nlp_prompts=nlp_prompts, object_type=object_type, clip_model=clip_model)
+                prediction = model(inputs, nlp_embedding)
+            else:
+                prediction = model(inputs)
+
+            prediction = prune_dimensions(prediction.cpu().detach().numpy())
             prediction = np.exp(prediction)
 
             pred_pos_probability = prediction[1]
@@ -354,18 +516,6 @@ def validate_classifier(model, val_files, result_dict, show_misclassified=True, 
 
             pred_labels.append(max_pred_idx)
 
-        if save_figure:
-            display = PrecisionRecallDisplay.from_predictions(y_true=gt_labels, y_pred=pred_pos_probabilities)
-            plt.savefig(results_path+"precision_recall_curve_fold_"+str(fold)+"_num_"+str(val_iter))
-            if VERBOSE:
-                plt.show(block=True)
-
-        true_positives = 0
-        false_positives = 0
-        false_negatives = 0
-        true_negatives = 0
-        for idx, data in enumerate(val_loader, 0):
-            _, label = data
             if label == 1:
                 if pred_labels[idx] == 1:
                     true_positives += 1
@@ -376,6 +526,12 @@ def validate_classifier(model, val_files, result_dict, show_misclassified=True, 
                     false_positives += 1
                 if pred_labels[idx] == 0:
                     true_negatives += 1
+
+        if save_figure:
+            display = PrecisionRecallDisplay.from_predictions(y_true=gt_labels, y_pred=pred_pos_probabilities)
+            plt.savefig(results_path+"precision_recall_curve_fold_"+str(fold)+"_num_"+str(val_iter))
+            if VERBOSE:
+                plt.show(block=True)
 
         if true_positives+false_positives > 0:
             precision = true_positives/(true_positives+false_positives)
@@ -419,6 +575,21 @@ def prune_dimensions(array):
     else:
         return array
 
+def split_file_list_evenly(file_list, fold_num, current_fold):
+    distinct_object_type_dict = {}
+    for name in file_list:
+        identifier = name.split("/")[-1].split("_")[1]
+        dict_list_append(identifier, name, distinct_object_type_dict)
+
+    val_list = []
+    train_list = []
+    for key in distinct_object_type_dict.keys():
+        val_sublist, train_sublist = split_file_list(distinct_object_type_dict[key], fold_num, current_fold)
+        val_list = val_list + val_sublist
+        train_list = train_list + train_sublist
+
+    return val_list, train_list
+
 def split_file_list(file_list, fold_num, current_fold):
     block_size = int(len(file_list)/fold_num)
     start_idx = current_fold*block_size
@@ -439,28 +610,50 @@ def stack_validation_averages(val_dict, tmp_val_dict):
         else:
             value = sum(tmp_val_dict[key])
     
-    dict_list_append(key, value, val_dict)
-    
+        dict_list_append(key, value, val_dict)
 
-def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""):
+def info_dict_to_wandb_format(dictionary):
+    for key in dictionary.keys():
+        if isinstance(dictionary[key], list):
+            if len(dictionary[key]) == 1:
+                dictionary[key] = dictionary[key][0]
+    return dictionary 
+
+def get_language_embedding(nlp_prompts, object_type, clip_model):
+    nlp_promt = random.choice(nlp_prompts[object_type])
+    prompt_tokens = clip.tokenize(nlp_promt).to(DEVICE)
+    prompt_embedding = clip_model.encode_text(prompt_tokens)
+    return prompt_embedding
+
+def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path="", regular_save=False, language_prompts_path=None):
     learning_rate = 0.0001
-    depth_grasp_classifier = Depth_Grasp_Classifier_v2()
-    nll_weights = torch.tensor([0.142,1.0])
+    nll_weights = torch.tensor([0.142,1.0]).to(DEVICE)
     criterion = nn.NLLLoss(weight=nll_weights)
-    optimizer = optim.SGD(depth_grasp_classifier.parameters(), lr=learning_rate)
+    clip_nlp_model = None
+    if language_prompts_path is not None:
+        clip_model_name = "ViT-B/32"
+        clip_nlp_model, _ = clip.load(clip_model_name, device=DEVICE)
+        nlp_promts = np.load(language_prompts_path)
 
     dataset_paths = get_dataset_paths(dataset_path)
     random.shuffle(dataset_paths)
 
-    loss_vals_gtf = []
-    loss_vals_gtt = []
-    average_loss = []
     validation_results = {}
-    snapshot_count = 0
     plot_count = 1
+    group_name = results_path.split("/")[-2]
     for fold in range(NUM_FOLDS):
-        current_best_f1 = 0
-        val_files, train_files = split_file_list(dataset_paths, NUM_FOLDS, fold)
+        loss_vals_gtf = []
+        loss_vals_gtt = []
+        average_loss = []
+        snapshot_count = 0
+        current_best_f1 = -1 # always save at least first model
+        gamma=0.8
+        depth_grasp_classifier = Depth_Grasp_Classifier_v3_norm()
+        depth_grasp_classifier.to(DEVICE)
+        optimizer = optim.SGD(depth_grasp_classifier.parameters(), lr=learning_rate)
+        scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
+
+        val_files, train_files = split_file_list_evenly(dataset_paths, NUM_FOLDS, fold)
 
         config={
             "optimizer type": type(optimizer),
@@ -473,17 +666,29 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
             "crossval fold": fold,
             "total folds": NUM_FOLDS,
             "pixel reduction factor": PIXEL_REDUCTION_FACTOR,
-            "start time and date": dnt_start
+            "start time and date": dnt_start,
+            "scheduler type": type(scheduler)
         }
 
+        if language_prompts_path is not None:
+            config["clip model"] = clip_model_name
+            config["language prompts"] = language_prompts_path
+
+        if isinstance(scheduler, optim.lr_scheduler.ExponentialLR):
+            config["scheduler gamma"] = gamma
+
         if isinstance(criterion, nn.NLLLoss):
-            config["NLL weights"]: nll_weights
+            config["NLL weights"] = nll_weights
+
+        run_name = "fold_" + str(fold)
 
         wandb.init(
             # set the wandb project where this run will be logged
             project="haptic-exploration-with-nlp",
             # track hyperparameters and run metadata
-            config=config
+            config=config,
+            name=run_name,
+            group=group_name
         )
 
         print(f"###### fold: {fold} ######")
@@ -491,23 +696,32 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
         for epoch in range(NUM_EPOCHS):
             for file_idx, train_file_name in enumerate(train_files):
                 print(f"--- {train_file_name} ---")
+
+                object_type = train_file_name.split("/")[-1].split("_")[1]
+
                 train_data, train_labels = load_depth_dataset(dataset_path=train_file_name)
                 
                 train_data = prune_dimensions(train_data)
                 train_labels = prune_dimensions(train_labels)
 
-                train_loader = dataset_to_data_loader(dataset=(train_data, train_labels), batch_size=1)
+                train_loader = dataset_to_data_loader(dataset=(train_data, train_labels), batch_size=BATCH_SIZE)
 
                 running_loss = 0
                 
                 for i, datapoint in enumerate(train_loader, 0):
                     inputs, label = datapoint
+                    inputs, label = inputs.to(DEVICE), label.to(DEVICE)
 
                     # zero the parameter gradients
                     optimizer.zero_grad()
 
                     # forward + backward + optimize
-                    outputs = depth_grasp_classifier(inputs)
+                    if clip_nlp_model is not None:
+                        language_embedding = get_language_embedding(nlp_prompts=nlp_promts, object_type=object_type, clip_model=clip_nlp_model)
+                        outputs = depth_grasp_classifier(inputs, language_embedding)
+                    else:
+                        outputs = depth_grasp_classifier(inputs)
+                        
                     loss = criterion(outputs, label)
                     loss.backward()
                     optimizer.step()
@@ -518,13 +732,13 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
                     #if i % 10 == 9:    # print every 2000 mini-batches
                     if VERBOSE:
                         print(f'[{epoch + 1}, {i + 1:5d}] loss: {current_loss:.3f}')
-                    
-                    if label.item() == 0:
-                        loss_vals_gtf.append(current_loss)
-                        wandb.log({"ground truth negative loss": current_loss})
-                    else:
-                        loss_vals_gtt.append(current_loss)
-                        wandb.log({"ground truth positive loss": current_loss})
+                    if BATCH_SIZE == 1:
+                        if label.item() == 0:
+                            loss_vals_gtf.append(current_loss)
+                            wandb.log({"ground truth negative loss": current_loss})
+                        else:
+                            loss_vals_gtt.append(current_loss)
+                            wandb.log({"ground truth positive loss": current_loss})
 
                     if i % 100 == 99: 
                         average_loss.append(running_loss/100)
@@ -532,28 +746,35 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
                         running_loss = 0
                     #running_loss = 0.0
 
-                if file_idx % 10: # every 10 files: make a snapshot that is permanent
-                    torch.save(depth_grasp_classifier, results_path+depth_grasp_classifier.name+"_model_snapshot_"+str(snapshot_count)+"_fold_"+str(fold))
-                    snapshot_count += 1
-                else: # otherwise make a snapshot that is temporary in case of crash
-                    torch.save(depth_grasp_classifier, results_path+depth_grasp_classifier.name+"_model_snapshot_"+str(snapshot_count)+"_fold_"+str(fold))
+                if regular_save:
+                    if file_idx % 10: # every 10 files: make a snapshot that is permanent
+                        torch.save(depth_grasp_classifier, results_path+depth_grasp_classifier.name+"_model_snapshot_"+str(snapshot_count)+"_fold_"+str(fold))
+                        snapshot_count += 1
+                    else: # otherwise make a snapshot that is temporary in case of crash
+                        torch.save(depth_grasp_classifier, results_path+depth_grasp_classifier.name+"_model_snapshot_"+str(snapshot_count)+"_fold_"+str(fold))
             
                 # run validation after every "file batch"
                 intermediate_validation_results = {}
-                validate_classifier(depth_grasp_classifier, val_files, intermediate_validation_results, fold=fold, save_figure=False, results_path=results_path)
-                wandb.log(intermediate_validation_results)
+                if clip_nlp_model is not None:
+                     validate_classifier(depth_grasp_classifier, val_files, intermediate_validation_results, fold=fold, save_figure=False, results_path=results_path, nlp_prompts=nlp_promts, clip_model=clip_nlp_model)
+                else:
+                    validate_classifier(depth_grasp_classifier, val_files, intermediate_validation_results, fold=fold, save_figure=False, results_path=results_path)
+                wandb.log(info_dict_to_wandb_format(intermediate_validation_results))
 
-                precision = intermediate_validation_results["precision"][0]
-                recall = intermediate_validation_results["recall"][0]
+                precision = intermediate_validation_results["precision"]
+                recall = intermediate_validation_results["recall"]
                 if precision == 0 and recall == 0:
                     f1_score = 0
                 else:
                     f1_score = 2*(precision*recall)/(precision+recall)
 
                 if f1_score > current_best_f1:
-                    torch.save(depth_grasp_classifier, results_path+depth_grasp_classifier.name+"_best_snapshot_"+str(snapshot_count)+"_fold_"+str(fold))
+                    torch.save(depth_grasp_classifier, results_path+depth_grasp_classifier.name+"_best_model_fold_"+str(fold))
                     current_best_f1 = f1_score
 
+                wandb.log({"current learning rate": scheduler.get_last_lr()[-1]})
+
+            scheduler.step()
 
         # Redundant, covered by wandb
         # fig, ax = plt.subplots(3)
@@ -565,9 +786,19 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
         # if VERBOSE:
         #    plt.show()
 
-        validate_classifier(depth_grasp_classifier, val_files, validation_results, fold=fold, results_path=results_path)
+        best_model = torch.load(results_path+depth_grasp_classifier.name+"_best_model_fold_"+str(fold))
+        tmp_validation_results = {}
 
-        
+        if clip_nlp_model is not None:
+            validate_classifier(best_model, val_files, tmp_validation_results, fold=fold, results_path=results_path, nlp_prompts=nlp_promts, clip_model=clip_nlp_model)
+        else:
+            validate_classifier(best_model, val_files, tmp_validation_results, fold=fold, results_path=results_path)
+        wandb.log(info_dict_to_wandb_format(intermediate_validation_results)) # last logged model in each fold is the best performing model
+        for key in tmp_validation_results.keys():
+            dict_list_append(key, tmp_validation_results[key], validation_results)
+
+        wandb.finish()
+
         if NO_CROSSVAL:
             break
 
@@ -584,19 +815,16 @@ def load_and_eval(model_path=MODEL_PATH[CURRENT_DEVICE], val_file_paths=VAL_FILE
 
 
 def main():
-
+    random.seed(42)
     now = datetime.now()
-    current_time_and_date = now.strftime("%m/%d/%y_%H:%M:%S")
+    current_time_and_date = now.strftime("%m.%d.%y_%H:%M:%S")
     results_folder_name = "results_run_" + current_time_and_date
     path = os.path.join(PATH[CURRENT_DEVICE], results_folder_name)
     results_folder_name = results_folder_name + "/"
     os.mkdir(path)
 
     if TRAIN:
-        try:
-            train_test_depth_pipeline(dataset_path=PATH[CURRENT_DEVICE]+DATA_DIRECTORY[CURRENT_DEVICE], dnt_start=current_time_and_date, results_path=PATH[CURRENT_DEVICE]+results_folder_name)
-        except Exception as e:
-            print(e)
+        train_test_depth_pipeline(dataset_path=PATH[CURRENT_DEVICE]+DATA_DIRECTORY[CURRENT_DEVICE], dnt_start=current_time_and_date, results_path=PATH[CURRENT_DEVICE]+results_folder_name, language_prompts_path=None)
     else:
         load_and_eval(results_path=PATH[CURRENT_DEVICE]+results_folder_name)
 
