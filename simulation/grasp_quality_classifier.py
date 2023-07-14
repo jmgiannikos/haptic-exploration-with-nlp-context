@@ -16,6 +16,7 @@ import wandb
 from datetime import datetime
 import clip
 
+LOAD_COLOR = True
 CALCULATE_LANGUAGE_EMBEDDING = False
 BATCH_SIZE = 20
 NUM_EPOCHS = 8
@@ -37,6 +38,84 @@ TRAIN = True
 NUM_FOLDS = 5
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 LANGUAGE_PROMPTS_PATH = "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/simple_nlp_prompts.npz"
+
+
+class Depth_Grasp_Classifier_v3_norm_col(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cnn_feature_extract = nn.Sequential(
+            nn.Conv2d(6, 32, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 1),
+            nn.Conv2d(32, 576, kernel_size=9, stride=3, padding=0),
+            nn.BatchNorm2d(576),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(576, 144, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(144),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
+
+        self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=0.5),
+            nn.Linear(5184, 1296),
+            nn.BatchNorm1d(1296),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(1296, 2),
+            torch.nn.LogSoftmax(1)
+        )
+
+        self.name = "v3 batch norm color"
+
+    def forward(self, x):
+        x = self.cnn_feature_extract(x)
+        x = self.avg_pool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
+
+class Depth_Grasp_Classifier_v3_nrm_ltagp_col(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cnn_feature_extract = nn.Sequential(
+            nn.Conv2d(6, 32, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 1),
+            nn.Conv2d(32, 576, kernel_size=9, stride=3, padding=0),
+            nn.BatchNorm2d(576),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(576, 144, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(144),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
+
+        self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
+
+        self.classifier = nn.Sequential(
+            nn.Linear(5189, 1296),
+            nn.BatchNorm1d(1296),
+            nn.ReLU(),
+            nn.Linear(1296, 2),
+            torch.nn.LogSoftmax(1)
+        )
+
+        self.name = "v3 batch norm l-tags-precalc color"
+
+    def forward(self, x, nlp_embedding):
+        x = self.cnn_feature_extract(x)
+        x = self.avg_pool(x)
+        x = torch.flatten(x, 1)
+        x = torch.cat((x,nlp_embedding),1)
+        x = self.classifier(x)
+        return x
 
 class Depth_Grasp_Classifier_v3_nrm_ltagp(nn.Module):
     def __init__(self):
@@ -294,6 +373,26 @@ class Depth_Grasp_Classifier(nn.Module):
         x = self.classifier(x)
         return x
     
+class color_dataset(Dataset):
+    def __init__(self, data=None, labels=None, object_types=None):
+        self.color_labels = convert_to_class_idx(labels)
+        self.color_images = data
+
+        self.object_types = object_types
+
+    def __len__(self):
+        return len(self.color_labels)
+
+    def __getitem__(self, idx):
+        color_image = self.color_images[idx]
+        color_label = self.color_labels[idx]
+
+        if self.object_types is not None:
+            object_type = self.object_types[idx]
+            return color_image, color_label, object_type
+        else:
+            return color_image, color_label
+
 class depth_dataset(Dataset):
     def __init__(self, data=None, labels=None, data_path=None, transform=None, target_transform=None, object_types=None):
 
@@ -401,7 +500,10 @@ def convert_to_class_idx(labels):
 
 def dataset_to_data_loader(dataset=None, data_path="", batch_size=1, object_types=None):
     if dataset is not None:
-        dataset = depth_dataset(data=dataset[0], labels=dataset[1], object_types=object_types)
+        if LOAD_COLOR:
+            dataset = color_dataset(data=dataset[0], labels=dataset[1], object_types=object_types)
+        else:
+            dataset = depth_dataset(data=dataset[0], labels=dataset[1], object_types=object_types)
     else:
         dataset = depth_dataset(data_path=data_path, object_types=object_types)
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
@@ -409,15 +511,29 @@ def dataset_to_data_loader(dataset=None, data_path="", batch_size=1, object_type
 
 def load_depth_dataset(dataset_path="", normalize=True):
     dataset = np.load(dataset_path)
-    if PIXEL_REDUCTION_FACTOR is None:
-        data = dataset["tactile_depth"]
+
+    if not LOAD_COLOR:
+        data_key = "tactile_depth"
     else:
-        tactile_depth = prune_dimensions(dataset["tactile_depth"])
-        data = reduce_depth_image_fidelity(tactile_depth, reduction_factor_x=PIXEL_REDUCTION_FACTOR, reduction_factor_y=PIXEL_REDUCTION_FACTOR)
-    
+        data_key = "tactile_color"
+
+    data = dataset[data_key]
+    data = prune_dimensions(data)
+
+    if LOAD_COLOR:
+        data = np.transpose(data, axes=(0,1,4,2,3))
+        data = data.astype('float32')
+
+    if PIXEL_REDUCTION_FACTOR is not None:
+        data = reduce_depth_image_fidelity(data, reduction_factor_x=PIXEL_REDUCTION_FACTOR, reduction_factor_y=PIXEL_REDUCTION_FACTOR)
+
+    if LOAD_COLOR:
+
+        data = normalize_rgb_min_max(data)
+
     labels = dataset["lift_success"]
 
-    if normalize:
+    if normalize and not LOAD_COLOR:
         initialized = False
         for data_point in data:
             dp_min = np.amin(data_point)
@@ -435,6 +551,21 @@ def load_depth_dataset(dataset_path="", normalize=True):
 
     return data, labels
 
+def normalize_rgb_min_max(dataset):
+    for i, matrix in enumerate(dataset):
+        for idx in range(6):
+            matrix_to_norm = matrix[idx,:,:]
+            normed_matrix = (matrix_to_norm - matrix_to_norm.min()) / (matrix_to_norm.max() - matrix_to_norm.min())
+            if idx == 0:
+                result_matrix = np.array([normed_matrix])
+            else:
+                result_matrix = np.append(result_matrix, np.array([normed_matrix]), 0)
+        if i == 0:
+            result_dataset = np.array([result_matrix])
+        else:
+            result_dataset = np.append(result_dataset, np.array([result_matrix]), 0)
+    return result_dataset
+
 def get_crossval_idxs(data, labels):
     splitter = StratifiedKFold()
     splits = splitter.split(X=data, y=labels)
@@ -445,10 +576,11 @@ def reduce_depth_image_fidelity(depth_images, reduction_factor_x=2, reduction_fa
     pooled_depth_images = None
     i = 0
     for depth_image in depth_images:
-        finger_1 = torch.from_numpy(np.array([depth_image[0]]))
-        finger_2 =  torch.from_numpy(np.array([depth_image[1]]))
+        finger_1 = torch.from_numpy(np.array(depth_image[0]))
+        finger_2 =  torch.from_numpy(np.array(depth_image[1]))
         pooled_finger_1 = np.asarray(pool_function(finger_1))
         pooled_finger_2 =  np.asarray(pool_function(finger_2))
+
         pooled_fingers = np.asarray([np.append(pooled_finger_1, pooled_finger_2, 0)])
 
         if verbose and i < 10:
@@ -714,7 +846,7 @@ def generate_object_type_dict(dataset_paths):
 
 def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path="", regular_save=False, language_prompts_path=None):
     learning_rate = 0.001
-    nll_weights = torch.tensor([0.142,1.0]).to(DEVICE)
+    nll_weights = torch.tensor([0.1,1.0]).to(DEVICE)
     criterion = nn.NLLLoss(weight=nll_weights)
     clip_nlp_model = None
     if language_prompts_path is not None:
@@ -737,7 +869,7 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
         snapshot_count = 0
         current_best_f1 = -1 # always save at least first model
         gamma=0.8
-        depth_grasp_classifier = Depth_Grasp_Classifier_v3_norm()
+        depth_grasp_classifier = Depth_Grasp_Classifier_v3_norm_col()
         depth_grasp_classifier.to(DEVICE)
         optimizer = optim.SGD(depth_grasp_classifier.parameters(), lr=learning_rate)
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
@@ -864,6 +996,8 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
                     torch.save(depth_grasp_classifier, results_path+depth_grasp_classifier.name+"_best_model_fold_"+str(fold))
                     current_best_f1 = f1_score
 
+                wandb.log({"f1 score": f1_score})
+
                 wandb.log({"current learning rate": scheduler.get_last_lr()[-1]})
 
             scheduler.step()
@@ -894,10 +1028,10 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
         if NO_CROSSVAL:
             break
 
-    print("Precision Values: " + str(validation_results["precision"]))
-    print("Recall Values: " + str(validation_results["recall"]))
-    print("average Precision:" + str(statistics.mean(validation_results["precision"])))
-    print("average Recall:" + str(statistics.mean(validation_results["recall"])))
+    #print("Precision Values: " + str(validation_results["precision"]))
+    #print("Recall Values: " + str(validation_results["recall"]))
+    #print("average Precision:" + str(statistics.mean(validation_results["precision"])))
+    #print("average Recall:" + str(statistics.mean(validation_results["recall"])))
 
 def load_and_eval(model_path=MODEL_PATH[CURRENT_DEVICE], val_file_paths=VAL_FILE_PATHS[CURRENT_DEVICE], results_path=""):
     validation_results = {}
@@ -907,6 +1041,7 @@ def load_and_eval(model_path=MODEL_PATH[CURRENT_DEVICE], val_file_paths=VAL_FILE
 
 
 def main():
+    #os.environ['WANDB_MODE'] = 'offline' # uncomment when making development runs
     random.seed(42)
     np.random.seed(seed=42)
     now = datetime.now()
@@ -917,7 +1052,7 @@ def main():
     os.mkdir(path)
 
     if TRAIN:
-        train_test_depth_pipeline(dataset_path=PATH[CURRENT_DEVICE]+DATA_DIRECTORY[CURRENT_DEVICE], dnt_start=current_time_and_date, results_path=PATH[CURRENT_DEVICE]+results_folder_name, language_prompts_path=LANGUAGE_PROMPTS_PATH)
+        train_test_depth_pipeline(dataset_path=PATH[CURRENT_DEVICE]+DATA_DIRECTORY[CURRENT_DEVICE], dnt_start=current_time_and_date, results_path=PATH[CURRENT_DEVICE]+results_folder_name, language_prompts_path=None)
     else:
         load_and_eval(results_path=PATH[CURRENT_DEVICE]+results_folder_name)
 
