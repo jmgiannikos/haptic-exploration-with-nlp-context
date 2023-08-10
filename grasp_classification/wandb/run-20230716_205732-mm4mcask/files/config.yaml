@@ -1,0 +1,185 @@
+wandb_version: 1
+
+optimizer type:
+  desc: null
+  value: torch.optim.sgd.SGD
+loss type:
+  desc: null
+  value: torch.nn.modules.loss.NLLLoss
+learning_rate:
+  desc: null
+  value: 0.001
+model:
+  desc: null
+  value: "Depth_Grasp_Classifier_v3_nrm_ltagp_col2(\n  (cnn_feature_extract): Sequential(\n\
+    \    (0): Conv2d(6, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))\n \
+    \   (1): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n\
+    \    (2): ReLU()\n    (3): MaxPool2d(kernel_size=3, stride=1, padding=0, dilation=1,\
+    \ ceil_mode=False)\n    (4): Conv2d(32, 576, kernel_size=(9, 9), stride=(3, 3))\n\
+    \    (5): BatchNorm2d(576, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n\
+    \    (6): ReLU()\n    (7): MaxPool2d(kernel_size=3, stride=2, padding=0, dilation=1,\
+    \ ceil_mode=False)\n    (8): Conv2d(576, 144, kernel_size=(3, 3), stride=(1, 1),\
+    \ padding=(1, 1))\n    (9): BatchNorm2d(144, eps=1e-05, momentum=0.1, affine=True,\
+    \ track_running_stats=True)\n    (10): ReLU()\n    (11): MaxPool2d(kernel_size=3,\
+    \ stride=2, padding=0, dilation=1, ceil_mode=False)\n  )\n  (avg_pool): AdaptiveAvgPool2d(output_size=(6,\
+    \ 6))\n  (classifier1): Sequential(\n    (0): Linear(in_features=5184, out_features=1296,\
+    \ bias=True)\n    (1): BatchNorm1d(1296, eps=1e-05, momentum=0.1, affine=True,\
+    \ track_running_stats=True)\n    (2): ReLU()\n    (3): Linear(in_features=1296,\
+    \ out_features=2, bias=True)\n    (4): LogSoftmax(dim=1)\n  )\n  (classifier2):\
+    \ Sequential(\n    (0): Linear(in_features=5184, out_features=1296, bias=True)\n\
+    \    (1): BatchNorm1d(1296, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n\
+    \    (2): ReLU()\n    (3): Linear(in_features=1296, out_features=2, bias=True)\n\
+    \    (4): LogSoftmax(dim=1)\n  )\n  (classifier3): Sequential(\n    (0): Linear(in_features=5184,\
+    \ out_features=1296, bias=True)\n    (1): BatchNorm1d(1296, eps=1e-05, momentum=0.1,\
+    \ affine=True, track_running_stats=True)\n    (2): ReLU()\n    (3): Linear(in_features=1296,\
+    \ out_features=2, bias=True)\n    (4): LogSoftmax(dim=1)\n  )\n  (classifier4):\
+    \ Sequential(\n    (0): Linear(in_features=5184, out_features=1296, bias=True)\n\
+    \    (1): BatchNorm1d(1296, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)\n\
+    \    (2): ReLU()\n    (3): Linear(in_features=1296, out_features=2, bias=True)\n\
+    \    (4): LogSoftmax(dim=1)\n  )\n  (classifier5): Sequential(\n    (0): Linear(in_features=5184,\
+    \ out_features=1296, bias=True)\n    (1): BatchNorm1d(1296, eps=1e-05, momentum=0.1,\
+    \ affine=True, track_running_stats=True)\n    (2): ReLU()\n    (3): Linear(in_features=1296,\
+    \ out_features=2, bias=True)\n    (4): LogSoftmax(dim=1)\n  )\n)"
+training datasets:
+  desc: null
+  value: "[['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random2.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random3.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random6.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random14.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random15.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random9.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random11.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random15.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random6.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random5.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random13.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random14.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random11.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random13.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random4.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random10.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random5.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random5.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random11.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random7.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random4.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random8.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random4.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random10.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random10.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random5.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random14.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random10.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random14.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random3.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random9.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random9.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random2.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random8.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random11.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random13.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random15.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random3.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random6.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random2.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random11.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random6.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random8.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random13.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random3.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random4.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random12.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random2.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random12.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random8.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random7.npz']\n\
+    \ ['/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random14.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random8.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random10.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random9.npz'\n\
+    \  '/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random12.npz']]"
+validation datasets:
+  desc: null
+  value:
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random5.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random15.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_ico_sphere_semi_random6.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random12.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random7.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cube_semi_random15.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random7.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random4.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_block_semi_random3.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random12.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder_semi_random7.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random2.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random9.npz
+  - /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/mixed_object_dataset/grasp_cylinder2_semi_random13.npz
+epochs:
+  desc: null
+  value: 8
+crossval fold:
+  desc: null
+  value: 1
+total folds:
+  desc: null
+  value: 5
+pixel reduction factor:
+  desc: null
+  value: 2
+start time and date:
+  desc: null
+  value: 07.16.23_20:11:01
+scheduler type:
+  desc: null
+  value: torch.optim.lr_scheduler.ExponentialLR
+clip model:
+  desc: null
+  value: ViT-B/32
+language prompts:
+  desc: null
+  value: /media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/simple_nlp_prompts.npz
+scheduler gamma:
+  desc: null
+  value: 0.8
+NLL weights:
+  desc: null
+  value:
+  - 0.10000000149011612
+  - 1.0
+_wandb:
+  desc: null
+  value:
+    python_version: 3.11.4
+    cli_version: 0.15.5
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1689555452.383412
+    t:
+      1:
+      - 1
+      - 5
+      - 41
+      - 53
+      - 55
+      2:
+      - 1
+      - 5
+      - 41
+      - 53
+      - 55
+      3:
+      - 2
+      - 13
+      - 16
+      - 23
+      4: 3.11.4
+      5: 0.15.5
+      8:
+      - 5
