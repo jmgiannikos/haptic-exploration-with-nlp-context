@@ -1,0 +1,105 @@
+{
+    "os": "Linux-5.15.0-76-generic-x86_64-with-glibc2.31",
+    "python": "3.11.4",
+    "heartbeatAt": "2023-07-20T20:26:29.240212",
+    "startedAt": "2023-07-20T20:26:27.829462",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/jan-malte/haptic-exploration-with-nlp-context/grasp_classification/grasp_quality_classifier.py",
+    "codePath": "grasp_classification/grasp_quality_classifier.py",
+    "git": {
+        "remote": "https://github.com/jmgiannikos/haptic-exploration-with-nlp-context.git",
+        "commit": "c5fc42da8dfd7ce55f88b50f30461dac318bd708"
+    },
+    "email": "jan-malte.giannikos@uni-bielefeld.de",
+    "root": "/home/jan-malte/haptic-exploration-with-nlp-context",
+    "host": "iam-drax",
+    "username": "jan-malte",
+    "executable": "/home/jan-malte/anaconda3/envs/haptic-nlp/bin/python3",
+    "cpu_count": 6,
+    "cpu_count_logical": 12,
+    "cpu_freq": {
+        "current": 3957.5435833333336,
+        "min": 800.0,
+        "max": 4700.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 3700.0,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3700.0,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 4300.054,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3700.0,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 4300.0,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3700.0,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 4299.998,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3700.0,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3700.0,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3700.0,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 4300.001,
+            "min": 800.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3700.0,
+            "min": 800.0,
+            "max": 4700.0
+        }
+    ],
+    "disk": {
+        "total": 203.84506225585938,
+        "used": 182.6205596923828
+    },
+    "gpu": "NVIDIA GeForce GTX 1080 Ti",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce GTX 1080 Ti",
+            "memory_total": 11811160064
+        }
+    ],
+    "memory": {
+        "total": 46.98717498779297
+    }
+}
