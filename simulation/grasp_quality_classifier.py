@@ -582,9 +582,16 @@ def load_and_eval(model_path=MODEL_PATH[CURRENT_DEVICE], val_file_paths=VAL_FILE
     validate_classifier(model, val_file_paths, validation_results, results_path=results_path)
     print(validation_results)
 
+def wandb_test():
+    for i in range(4):
+        wandb.init(
+            project="haptic-exploration-with-nlp",
+            name="test"+str(i)
+        )
+        wandb.finish()
+
 
 def main():
-
     now = datetime.now()
     current_time_and_date = now.strftime("%m/%d/%y_%H:%M:%S")
     results_folder_name = "results_run_" + current_time_and_date
