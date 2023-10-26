@@ -2,25 +2,33 @@ import random
 import clip
 import torch
 import numpy as np
+import json
 
 import grasp_cls_pipeline_configs as configs
 
-def split_nlp_prompt_dict(folds):
-    prompts = np.load(configs.get_language_prompts_path())
-    train_test_dicts = [{"train":{},"val":{}}]*folds
-    for key in prompts.keys():
-        prompt_list = prompts[key]
-        block_size = int(len(prompt_list)/folds)
-        for fold in range(folds):
-            if fold != folds-1:
-                start_idx = block_size*fold
-                end_idx = start_idx+block_size
-            else:
-                start_idx = block_size*fold
-                end_idx = -1
+def split_nlp_prompt_dict(folds, language_prompts_path=None):
+    if configs.get_predefined_language_splits_path() is not None:
+        file = open(configs.get_predefined_language_splits_path())
+        train_test_dicts = json.load(file)
+    else:
+        if language_prompts_path is not None:
+            prompts = np.load(language_prompts_path)
+        else:
+            prompts = np.load(configs.get_language_prompts_path())
+        train_test_dicts = [{"train":{},"val":{}}]*folds
+        for key in prompts.keys():
+            prompt_list = prompts[key]
+            block_size = int(len(prompt_list)/folds)
+            for fold in range(folds):
+                if fold != folds-1:
+                    start_idx = block_size*fold
+                    end_idx = start_idx+block_size
+                else:
+                    start_idx = block_size*fold
+                    end_idx = -1
 
-            train_test_dicts[fold]["val"][key] = prompt_list[start_idx:end_idx]
-            train_test_dicts[fold]["train"][key] = [prompt for prompt in prompt_list if prompt not in train_test_dicts[fold]["val"][key]]
+                train_test_dicts[fold]["val"][key] = prompt_list[start_idx:end_idx]
+                train_test_dicts[fold]["train"][key] = [prompt for prompt in prompt_list if prompt not in train_test_dicts[fold]["val"][key]]
 
     return train_test_dicts
 

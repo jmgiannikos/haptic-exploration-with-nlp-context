@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import os
+import json
 
 import grasp_cls_pipeline_configs as configs
 import grasp_datasets as gds
@@ -180,3 +181,8 @@ def split_file_list_evenly_groupings(file_list, fold_num, current_fold):
     train_list = train_list.T
 
     return val_list, train_list
+
+def load_predefined_train_val(fold):
+    file = open(configs.get_predefined_train_val_path())
+    splits = json.load(file)
+    return splits[f"{fold}"]["val"], splits[f"{fold}"]["train"]

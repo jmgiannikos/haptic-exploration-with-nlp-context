@@ -26,7 +26,9 @@ def object_type_to_class_idx(labels):
     return result_list
 
 def class_idxs_to_one_hot(class_idxs):
-    num_idxs = len(set(class_idxs))
+    f = open(configs.get_object_type_json_path(),mode="r")
+    object_type_dict = json.load(f)
+    num_idxs = len(list(object_type_dict.keys()))
     result_array = None
     for class_idx in class_idxs:
         one_hot = [0]*num_idxs

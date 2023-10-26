@@ -6,95 +6,80 @@ LOAD_COLOR = True
 CALCULATE_LANGUAGE_EMBEDDING = True
 BATCH_SIZE = 20
 NUM_EPOCHS = 50
-VERBOSE = True
+VERBOSE = False
 PIXEL_REDUCTION_FACTOR = 2
-CURRENT_DEVICE = "drax"
-PATH = {"laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/",
+CURRENT_DEVICE = "laptop"
+PATH = {"laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/",
         "drax": "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/"}
-DATA_DIRECTORY = {"laptop": "ico_sphere_dataset/",
+DATA_DIRECTORY = {"laptop": "grasps/",
                   "drax": "irl_mixed_dataset/"} # "block_dataset/ cube_dataset/ cylinder1_dataset/ cylinder2_dataset/ ico_sphere_dataset/"
 NO_CROSSVAL = False
-MODEL_PATH = {"laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/block training model snapshots/_model_snapshot_70",
+MODEL_PATH = {"laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/results_run_09.12.23_10:33:57/v3 batch norm color 2_best_model_fold_4",
               "drax": "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset nlp classifiers 20ep/v3 batch norm l-tags color_model_snapshot_20_fold_0"}
 
 # the appropriate val file paths should be saved in wandb run and easily retrievable. Have to be set before eval
-VAL_FILE_PATHS = {"laptop":"",
-                  "drax":["/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_ico_sphere_semi_random.npz",
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_ico_sphere_semi_random2.npz"]}
+VAL_FILE_PATHS = {"laptop":["/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_rubber_duck_semi_random12.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_rubber_duck_semi_random2.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_microphone1_semi_random7.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_microphone1_semi_random9.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_hair_dryer_semi_random11.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_hair_dryer_semi_random8.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_can1_semi_random12.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_can1_semi_random6.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_bottle1_semi_random12.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_bottle1_semi_random4.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_camera_semi_random6.npz",
+"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/grasps/grasp_camera_semi_random7.npz"],
+                  "drax":[]}
 
-"""
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/irl_ico_sphere_dataset/real_grasp__ico-sphere4.npz",
-                          "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/irl_ico_sphere_dataset/real_grasp__ico-sphere6.npz",
-                          "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/irl_ico_sphere_dataset/real_grasp__ico-sphere7.npz",
-                          "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/irl_ico_sphere_dataset/real_grasp__ico-sphere8.npz",
-                          "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/irl_ico_sphere_dataset/real_grasp__ico-sphere9.npz",
-                          "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/irl_ico_sphere_dataset/real_grasp__ico-sphere10.npz",
-                          "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/irl_ico_sphere_dataset/real_grasp__ico-sphere11.npz",
-                          "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/irl_ico_sphere_dataset/real_grasp__ico-sphere12.npz",
-
-
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_0_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_1_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_2_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_3_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_4_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_5_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_6_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_7_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_8_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_9_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_10_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_11_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_12_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_13_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_14_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_15_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_16_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_17_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_18_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_19_fold_0",
-                       "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/full dataset baseline 20ep/v3 batch norm color 2_model_snapshot_20_fold_0",
-"""
-
-"""
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_block_semi_random.npz",
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_block_semi_random2.npz",
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_cube_semi_random.npz",
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_cube_semi_random2.npz",
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_cylinder_semi_random.npz",
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_cylinder_semi_random2.npz",
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_cylinder2_semi_random.npz",
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_cylinder2_semi_random2.npz",
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_ico_sphere_semi_random.npz",
-"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/testset/testset_ico_sphere_semi_random2.npz",
-"""
-
-TRAIN = False
+TRAIN = True
 NUM_FOLDS = 5
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-LANGUAGE_PROMPTS_PATH = {"drax":"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/simple_nlp_prompts.npz",
+LANGUAGE_PROMPTS_PATH = {"laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/gpt_generated_object_prompt_dataset.npz",
+                        "raw_laptop": "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/gpt_generated_holdout_prompts.npz",
+                         "drax":"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/simple_nlp_prompts.npz",
                          "raw_drax":"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/nlp-cls/simple_nlp_use_dataset.npz"}
 USE_LANGUAGE_PROMPTS = True
 LEARNING_RATE = 0.002
-CRITERION_ARGS = {"weight": torch.tensor([0.1,0.9]).to(DEVICE)}
+CRITERION_ARGS = {"weight": torch.tensor([0.05,0.95]).to(DEVICE)}
 LOSS_CRITERION = nn.NLLLoss(**CRITERION_ARGS)
 CLIP_MODEL_NAME = "ViT-L/14"
 GAMMA = 0.9
-NLP_CLASSIFIER_PATH = {"vit-l":"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/nlp-cls/nlp_cls_results_run_07.17.23_23:30:35/nlp cls v2_best_model_fold_0",
-                       "vit-b":"/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/nlp-cls/nlp_cls_results_run_07.17.23_22:42:12/nlp cls v1_best_model_fold_0"}
+NLP_CLASSIFIER_PATH = {"vit-l":"",
+                       "vit-b":"/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/simulation/grasp_datasets/complex_objects/nlp_cls_results_run_09.12.23_03:41:28/nlp cls complex obj_best_model_fold_0"}
 LOAD_CNN = False
 CNN_PATH = "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/results_run_07.19.23_20:44:38/v3 batch norm color_best_model_fold_0"
 FROZEN_CNN = False
-NLP_CLASSIFIER_TYPE = "vit-l"
-DATASET_NAME = "mixed dataset"
+NLP_CLASSIFIER_TYPE = "vit-b"
+DATASET_NAME = "complex object dataset"
 FROZEN_CLIP = True
-REGULAR_SAVE = False
+REGULAR_SAVE = True
 EPOCH_SAVE = False
-LOAD_PRETRAINED_MODEL = True
-
+LOAD_PRETRAINED_MODEL = False
+PREDEFINED_TRAIN_VAL_PATH = "/home/jan-malte/Bachelors Thesis/predefined_train_test_splits.json"
+PREDEFINED_LANGUAGE_SPLITS = "/home/jan-malte/Bachelors Thesis/predefined_nlp_dataset.json"
+USE_RAW_CLIP_MODEL = True
 
 CONF_DICT = {}
 
+def get_use_raw_clip_model():
+    if "USE_RAW_CLIP_MODEL" in CONF_DICT.keys():
+        return CONF_DICT["USE_RAW_CLIP_MODEL"]
+    else:
+        return USE_RAW_CLIP_MODEL
+
+def get_predefined_language_splits_path():
+    if "PREDEFINED_LANGUAGE_SPLITS" in CONF_DICT.keys():
+        return CONF_DICT["PREDEFINED_LANGUAGE_SPLITS"]
+    else:
+        return PREDEFINED_LANGUAGE_SPLITS
+
+def get_predefined_train_val_path():
+    if "PREDEFINED_TRAIN_VAL_PATH" in CONF_DICT.keys():
+        return CONF_DICT["PREDEFINED_TRAIN_VAL_PATH"]
+    else:
+        return PREDEFINED_TRAIN_VAL_PATH
+    
 def get_load_pretrained_model():
     if "LOAD_PRETRAINED_MODEL" in CONF_DICT.keys():
         return CONF_DICT["LOAD_PRETRAINED_MODEL"]

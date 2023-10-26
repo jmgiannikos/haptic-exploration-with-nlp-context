@@ -1,1 +1,0 @@
-{"average overall loss in the last 100 steps": 0.012465334187727422, "_timestamp": 1689920000.3329875, "_runtime": 35212.484741449356, "_step": 1536, "precision": 0.9111497624221323, "recall": 0.7821016336679197, "tp": 970, "tn": 9834, "fp": 79, "fn": 232, "f1 score": 0.8417081118043122, "current learning rate": 7.630408489538923e-05, "_wandb": {"runtime": 35211}}

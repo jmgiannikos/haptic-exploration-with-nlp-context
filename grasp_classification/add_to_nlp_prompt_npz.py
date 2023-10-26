@@ -1,13 +1,51 @@
 import os
 import numpy as np
 
-NLP_PROMPT_FILE_PATH = "/media/jan-malte/17d1286b-1125-41e3-bf20-59faed637169/jan-malte/simple_nlp_prompts.npz"
-ADD_DICT = {"ico":["ico sphere"],
-            "cylinder":["lying cylinder"],
-            "block":["block"],
-            "cube":["cube"],
-            "cylinder2":["upright cylinder"]}
-
+NLP_PROMPT_FILE_PATH = "/home/jan-malte/Bachelors Thesis/haptic-exploration-with-nlp-context/grasp_classification/complex_objects_nlp_prompts.npz"
+ADD_DICT = {
+    "mircrophone1": [
+        "microphone",
+        "mic",
+        "audio recorder",
+        "handheld microphone",
+        "voice recorder"
+    ],
+    "rubber": [
+        "rubber duck",
+        "duck",
+        "animal toy",
+        "ducky",
+        "squeaky toy"
+    ],
+    "hair": [
+        "hair dryer",
+        "blow-dryer",
+        "hand blower",
+        "blow drier",
+        "hair drier"
+    ],
+    "can1": [
+        "can",
+        "soda can",
+        "aluminium can",
+        "cylindrical object",
+        "canister"
+    ],
+    "camera": [
+        "camera",
+        "digital camera",
+        "photo camera",
+        "handheld camera",
+        "cam"
+    ],
+    "bottle": [
+        "bottle",
+        "glass bottle",
+        "water bottle",
+        "wine",
+        "flask"
+    ]
+}
 def dict_list_append(key, val, target_dict):
     if key in target_dict.keys():
         target_dict[key].append(val)

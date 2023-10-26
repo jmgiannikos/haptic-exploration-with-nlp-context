@@ -96,7 +96,7 @@ def calculate_precision_and_recall(confusion_matrix_dict):
 
     return precision, recall
 
-def validate_classifier(model, val_files, result_dict, fold=-1, save_figure=True, results_path="", nlp_prompts=None, clip_model = None, object_type_dict=None, load_lift_distances=False):
+def validate_classifier(model, val_files, result_dict, criterion=None, fold=-1, save_figure=True, results_path="", nlp_prompts=None, clip_model = None, object_type_dict=None, load_lift_distances=False):
     model.eval()
     tmp_val_dict = {}
     for val_iter, val_file_name in enumerate(val_files):
@@ -123,6 +123,8 @@ def validate_classifier(model, val_files, result_dict, fold=-1, save_figure=True
         }
         object_type = val_file_name.split("/")[-1].split("_")[1]
 
+        running_loss = 0
+        average_loss = []
         ## ITERATE THROUGH VAL LOADER ##
         for idx, data in enumerate(val_loader, 0):
             #load datapoint
@@ -140,6 +142,18 @@ def validate_classifier(model, val_files, result_dict, fold=-1, save_figure=True
                     prediction = model(inputs, nlp_embedding)
             else:
                 prediction = model(inputs)
+
+            # calculate validation loss
+            if criterion is not None:
+                loss = criterion(prediction, label.to(configs.get_device()))
+                current_loss = loss.item()
+                running_loss += current_loss
+                if idx % 100 == 99: 
+                    average_loss.append(running_loss/100)
+                    wandb.log({"average validation loss in the last 100 steps": running_loss/100})
+                    running_loss = 0
+            
+
             # prediction to usable numpy
             prediction = dp.prune_dimensions(prediction.cpu().detach().numpy())
             # remove log so model acts as softmax (assumes NLL loss is usually used)
@@ -267,6 +281,7 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
         clip_nlp_model, _ = clip.load(configs.get_clip_model_name(), device=configs.get_device())
         nlp_promts = np.load(configs.get_language_prompts_path())
 
+    # TODO: Function to set this to pre established train/val splits for more comparability  
     dataset_paths = dl.get_dataset_paths(dataset_path)
     object_type_dict = nlpp.generate_object_type_dict(dataset_paths)
 
@@ -290,7 +305,12 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
             if configs.get_provide_raw_nlp_prompt():
                 nlp_classifier = torch.load(configs.get_nlp_classifier_path())
                 nlp_classifier_name = nlp_classifier.name
-                depth_grasp_classifier = Depth_Grasp_Classifier_v3_nrm_ltag_col(nlp_classifier)
+                if configs.get_use_raw_clip_model():
+                    depth_grasp_classifier = Grasp_Classifier_Raw_CLIP()
+                else:
+                    depth_grasp_classifier = Depth_Grasp_Classifier_v3_nrm_ltag_col(nlp_classifier)
+            elif configs.get_use_language_prompts() and not configs.get_calculate_language_embedding():
+                depth_grasp_classifier = Depth_Grasp_Classifier_v3_nrm_ltagp_col()
             elif configs.get_load_cnn():
                 cnn = configs.get_cnn()
                 depth_grasp_classifier = Depth_Grasp_Classifier_v3_norm_col_preset_CNN(cnn)
@@ -303,6 +323,9 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
 
         if configs.get_frozen_clip() and isinstance(depth_grasp_classifier, Depth_Grasp_Classifier_v3_nrm_ltag_col):
             for param in depth_grasp_classifier.nlp_model.clip.transformer.resblocks:
+                param.requires_grad = False
+        elif configs.get_frozen_clip() and isinstance(depth_grasp_classifier, Grasp_Classifier_Raw_CLIP):
+            for param in depth_grasp_classifier.nlp_model.modules():
                 param.requires_grad = False
 
         depth_grasp_classifier.to(configs.get_device())
@@ -323,7 +346,10 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
                 train_files.append(append_chunk)
             val_files = None
         else:
-            val_files, train_files = dl.split_file_list_evenly_groupings(dataset_paths, configs.get_num_folds(), fold)
+            if configs.get_predefined_train_val_path() is not None:
+                val_files, train_files = dl.load_predefined_train_val(fold)
+            else:
+                val_files, train_files = dl.split_file_list_evenly_groupings(dataset_paths, configs.get_num_folds(), fold)
 
         wandb_setup(optimizer, dnt_start, depth_grasp_classifier, train_files, val_files, fold, scheduler, results_path, nlp_classifier_name)
 
@@ -350,7 +376,7 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
 
                     # forward + backward + optimize
                     if configs.get_use_language_prompts():
-                        if isinstance(depth_grasp_classifier, Depth_Grasp_Classifier_v3_nrm_ltag_col):
+                        if isinstance(depth_grasp_classifier, Depth_Grasp_Classifier_v3_nrm_ltag_col) or isinstance(depth_grasp_classifier, Grasp_Classifier_Raw_CLIP):
                             language_prompt = nlpp.get_language_prompt(object_types, train_val_prompts[fold]["train"])
                             outputs = depth_grasp_classifier(inputs, language_prompt) 
                         else:
@@ -381,11 +407,11 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
                     if configs.get_use_language_prompts():
                         if configs.get_provide_raw_nlp_prompt():
                             raw_nlp_prompts = train_val_prompts[fold]["train"]
-                            validate_classifier(depth_grasp_classifier, val_files, intermediate_validation_results, fold=fold, save_figure=False, results_path=results_path, nlp_prompts=raw_nlp_prompts, clip_model=clip_nlp_model, object_type_dict=object_type_dict)
+                            validate_classifier(depth_grasp_classifier, val_files, intermediate_validation_results, criterion=criterion, fold=fold, save_figure=False, results_path=results_path, nlp_prompts=raw_nlp_prompts, clip_model=clip_nlp_model, object_type_dict=object_type_dict)
                         else:
-                            validate_classifier(depth_grasp_classifier, val_files, intermediate_validation_results, fold=fold, save_figure=False, results_path=results_path, nlp_prompts=nlp_promts, clip_model=clip_nlp_model, object_type_dict=object_type_dict)
+                            validate_classifier(depth_grasp_classifier, val_files, intermediate_validation_results, criterion=criterion, fold=fold, save_figure=False, results_path=results_path, nlp_prompts=nlp_promts, clip_model=clip_nlp_model, object_type_dict=object_type_dict)
                     else:
-                        validate_classifier(depth_grasp_classifier, val_files, intermediate_validation_results, fold=fold, save_figure=False, results_path=results_path)
+                        validate_classifier(depth_grasp_classifier, val_files, intermediate_validation_results, criterion=criterion, fold=fold, save_figure=False, results_path=results_path)
                     wandb.log(gcls_utils.info_dict_to_wandb_format(intermediate_validation_results))
 
                     precision = intermediate_validation_results["precision"]
@@ -423,9 +449,9 @@ def train_test_depth_pipeline(dataset_path="", dnt_start="none", results_path=""
         tmp_validation_results = {}
 
         if configs.get_use_language_prompts():
-            validate_classifier(best_model, val_files, tmp_validation_results, fold=fold, results_path=results_path, nlp_prompts=nlp_promts, clip_model=clip_nlp_model, object_type_dict=object_type_dict)
+            validate_classifier(best_model, val_files, tmp_validation_results, criterion=criterion, fold=fold, results_path=results_path, nlp_prompts=nlp_promts, clip_model=clip_nlp_model, object_type_dict=object_type_dict)
         else:
-            validate_classifier(best_model, val_files, tmp_validation_results, fold=fold, results_path=results_path)
+            validate_classifier(best_model, val_files, tmp_validation_results, criterion=criterion, fold=fold, results_path=results_path)
         wandb.log(gcls_utils.info_dict_to_wandb_format(intermediate_validation_results)) # last logged model in each fold is the best performing model
         for key in tmp_validation_results.keys():
             gcls_utils.dict_list_append(key, tmp_validation_results[key], validation_results)

@@ -1,1 +1,0 @@
-{"precision": 0.996031746031746, "recall": 0.533561197877825, "tp": 274, "tn": 1708, "fp": 1, "fn": 240, "_timestamp": 1690309452.5456955, "_runtime": 171.30049347877502, "_step": 26, "f1 score": 0.6948827708091974, "current learning rate": 0.002, "_wandb": {"runtime": 176}}

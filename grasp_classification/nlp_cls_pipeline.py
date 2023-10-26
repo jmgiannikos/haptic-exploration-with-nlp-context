@@ -6,6 +6,9 @@ import random
 import wandb
 from datetime import datetime
 import json
+from sklearn.metrics.pairwise import cosine_similarity
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 import nlp_cls_pipeline_configs as configs
 import nlp_classifiers as nlp_cls
@@ -43,6 +46,27 @@ def wandb_setup(optimizer, dnt_start, nlp_classifier, fold, scheduler, results_p
         name=run_name,
         group=group_name
     )   
+
+def save_train_state(crossval_dict, fold, path):
+    save_dict = {}
+    for key in crossval_dict.keys():
+        value = crossval_dict[key]
+        if isinstance(value, np.ndarray):
+            value = value.tolist()
+        save_dict[key] = value
+    save_dict["fold"] = fold
+
+    with open(path+'train_state.json', 'w') as f:
+        json.dump(save_dict, f)
+
+def update_fold_in_train_state(fold, path):
+    f = open(path+'train_state.json')
+    train_state_dict = json.load(f)
+
+    train_state_dict["fold"] = fold
+
+    with open(path+'train_state.json', 'w') as f:
+        json.dump(train_state_dict, f)
 
 def validate_classifier(model, val_data, val_labels, result_dict):
     model.eval()
@@ -95,10 +119,18 @@ def train_test_depth_pipeline(dnt_start="none", results_path=""):
     dataset = dataset["nlp prompt"]
     crosval_split_dict = dl.nlp_train_test_split(dataset, labels, configs.get_num_folds())
 
+    # save initial train state
+    save_train_state(crossval_dict=crosval_split_dict, fold=0, path=results_path)
+
+    # save conf dict
+    configs.dump_conf_dict(results_path)
+
     validation_results = {}
     for fold in range(configs.get_num_folds()):
         current_best_accuracy = -1 # always save at least first model
-        nlp_classifier = nlp_cls.Nlp_classifier2()
+        nlp_classifier = nlp_cls.Nlp_classifier_complex_objects()
+        if configs.get_frozen_clip():
+            nlp_classifier.clip.requires_grad = False
         optimizer = optim.SGD(nlp_classifier.parameters(), lr=configs.get_learning_rate())
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=configs.get_gamma())
 
@@ -156,6 +188,10 @@ def train_test_depth_pipeline(dnt_start="none", results_path=""):
 
             scheduler.step()
 
+        # update training state
+        update_fold_in_train_state(fold, results_path)
+
+        # save model
         best_model = torch.load(results_path+nlp_classifier.name+"_best_model_fold_"+str(fold))
         tmp_validation_results = {}
 
@@ -170,20 +206,107 @@ def train_test_depth_pipeline(dnt_start="none", results_path=""):
         if configs.get_no_crossval():
             break
 
+def generate_cosine_similarity_matrix():
+    dataset = np.load(configs.get_nlp_dataset_path())
+    labels = dataset["object type"]
+    dataset = dataset["nlp prompt"]
+    model = torch.load(configs.get_model_path())
+    crosval_split_dict = dl.nlp_train_test_split(dataset, labels, configs.get_num_folds())
+    train_data = crosval_split_dict[f"train_{configs.get_crossval_fold_loaded()}_data"]
+    train_labels = crosval_split_dict[f"train_{configs.get_crossval_fold_loaded()}_labels"]
+    val_data = crosval_split_dict[f"val_{configs.get_crossval_fold_loaded()}_data"]
+    val_labels = crosval_split_dict[f"val_{configs.get_crossval_fold_loaded()}_labels"]
+
+    # cosine similarity for train set
+    train_loader = dl.nlp_dataset_to_data_loader(dataset=(train_data, train_labels))
+    
+    for i, batch in enumerate(train_loader, 0):
+        inputs, labels = batch
+        inputs, labels = inputs[0], labels.to(configs.get_device())
+
+        # forward + backward + optimize
+        outputs = model(inputs)
+
+        outputs = outputs.detach().cpu().numpy()
+        labels = labels.detach().cpu().numpy()
+
+        if i == 0:
+            train_outputs = outputs
+            train_labels = labels
+        else: 
+            train_outputs = np.append(train_outputs, outputs, 0)
+            train_labels = np.append(train_labels, labels, 0)
+ 
+    # cosine similarity for test set
+    val_loader = dl.nlp_dataset_to_data_loader(dataset=(val_data, val_labels))
+    for i, batch in enumerate(val_loader, 0):
+        inputs, labels = batch
+        inputs, labels = inputs[0], labels.to(configs.get_device())
+
+        # forward + backward + optimize
+        outputs = model(inputs)
+
+        outputs = outputs.detach().cpu().numpy()
+        labels = labels.detach().cpu().numpy()
+
+        if i == 0:
+            val_outputs = outputs
+            val_labels = labels
+        else: 
+            val_outputs = np.append(val_outputs, outputs, 0)
+            val_labels = np.append(val_labels, labels, 0)
+
+    train_cosine_similarity = calculate_cosine_similarity_matrix(train_outputs, train_labels)
+
+    sns.heatmap(train_cosine_similarity, annot=True, cmap="YlGnBu")
+    plt.show()
+
+    val_cosine_similarity = calculate_cosine_similarity_matrix(val_outputs, val_labels)
+
+    sns.heatmap(val_cosine_similarity, annot=True, cmap="YlGnBu")
+    plt.show()
+
+def calculate_cosine_similarity_matrix(outputs, labels):
+    num_classes = np.shape(labels)[1]
+    for class_idx in range(num_classes):
+        base_vector = [0]*num_classes
+        base_vector[class_idx] = 1
+        vector = np.array([base_vector])
+        if class_idx == 0:
+            class_vectors = vector
+        else:
+            class_vectors = np.append(class_vectors, vector, 0)
+
+    cosine_similarities = cosine_similarity(outputs, class_vectors)
+
+    cosine_similarity_matrix = np.matmul(labels.T, cosine_similarities)
+
+    for idx in range(np.shape(cosine_similarity_matrix)[1]):
+        normalized_row = cosine_similarity_matrix[idx]/np.sum(cosine_similarity_matrix[idx])
+        if idx == 0:
+            normalized_similarity_matrix = np.array([normalized_row])
+        else:
+            normalized_similarity_matrix = np.append(normalized_similarity_matrix,  np.array([normalized_row]), 0)
+        
+    return normalized_similarity_matrix
+
 def main():
-    #os.environ['WANDB_MODE'] = 'offline' # uncomment when making development runs
-    if configs.get_random_seed() is not None:
-        random.seed(configs.get_random_seed())
-        np.random.seed(seed=configs.get_random_seed())
+    if configs.get_calculate_cosine_similarity_matrix():
+        generate_cosine_similarity_matrix()
+    else:
+        #os.environ['WANDB_MODE'] = 'offline' # uncomment when making development runs
+        if configs.get_random_seed() is not None:
+            random.seed(configs.get_random_seed())
+            np.random.seed(seed=configs.get_random_seed())
 
-    now = datetime.now()
-    current_time_and_date = now.strftime("%m.%d.%y_%H:%M:%S")
-    results_folder_name = "nlp_cls_results_run_" + current_time_and_date
-    path = os.path.join(configs.get_path(), results_folder_name)
-    results_folder_name = results_folder_name + "/"
-    os.mkdir(path)
+        now = datetime.now()
+        current_time_and_date = now.strftime("%m.%d.%y_%H:%M:%S")
+        results_folder_name = "nlp_cls_results_run_" + current_time_and_date
+        path = os.path.join(configs.get_path(), results_folder_name)
+        results_folder_name = results_folder_name + "/"
+        os.mkdir(path)
 
-    train_test_depth_pipeline(dnt_start=current_time_and_date, results_path=configs.get_path()+results_folder_name)
+        train_test_depth_pipeline(dnt_start=current_time_and_date, results_path=configs.get_path()+results_folder_name)
 
 if __name__ == '__main__':
     main()

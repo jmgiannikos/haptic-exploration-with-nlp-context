@@ -4,6 +4,31 @@ import clip
 
 import nlp_cls_pipeline_configs as configs
 
+class Nlp_classifier_complex_objects(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.clip, _ = clip.load("ViT-L/14", device=configs.get_device())
+
+        self.classifier = nn.Sequential(
+            nn.Linear(768, 384),
+            nn.Dropout(),
+            nn.ReLU(),
+            nn.Linear(384, 192),
+            nn.Dropout(),
+            nn.ReLU(),
+            nn.Linear(192, 6),
+            nn.Softmax(1)
+        )
+
+        self.name = "nlp cls complex obj"
+
+    def forward(self, prompt):
+        prompt_tokens = clip.tokenize(prompt).to(configs.get_device())
+        prompt_embedding = self.clip.encode_text(prompt_tokens)
+        embedding = self.classifier(prompt_embedding.float())
+        return embedding 
+
 class Nlp_classifier2(nn.Module):
     def __init__(self):
         super().__init__()

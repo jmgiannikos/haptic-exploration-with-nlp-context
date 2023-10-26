@@ -1,5 +1,50 @@
 import torch.nn as nn
 import torch
+import clip
+
+import grasp_cls_pipeline_configs as configs
+
+class Grasp_Classifier_Raw_CLIP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cnn_feature_extract = nn.Sequential(
+            nn.Conv2d(6, 32, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 1),
+            nn.Conv2d(32, 576, kernel_size=9, stride=3, padding=3),
+            nn.BatchNorm2d(576),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(576, 144, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(144),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
+
+        self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
+
+        self.classifier = nn.Sequential(
+            nn.Linear(5952, 1296),
+            nn.BatchNorm1d(1296),
+            nn.ReLU(),
+            nn.Linear(1296, 2),
+            torch.nn.LogSoftmax(1)
+        )
+
+        self.nlp_model , _ = clip.load("ViT-L/14", device=configs.get_device())
+
+        self.name = "grasp classifier that uses only CLIP for language embeddings"
+
+    def forward(self, x, nlp_prompt):
+        x = self.cnn_feature_extract(x)
+        x = self.avg_pool(x)
+        x = torch.flatten(x, 1)
+        prompt_tokens = clip.tokenize(nlp_prompt).to(configs.get_device())
+        nlp_embedding = self.nlp_model.encode_text(prompt_tokens)
+        x = torch.cat((x,nlp_embedding),1)
+        x = self.classifier(x)
+        return x
 
 class Depth_Grasp_Classifier_v3_norm_col3(nn.Module):
     def __init__(self):
@@ -30,6 +75,13 @@ class Depth_Grasp_Classifier_v3_norm_col3(nn.Module):
         )
 
         self.name = "v3 batch norm color 3"
+
+    def forward(self, x):
+        x = self.cnn_feature_extract(x)
+        x = self.avg_pool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
 
 class Depth_Grasp_Classifier_v3_norm_col_preset_CNN(nn.Module):
     def __init__(self, cnn):
@@ -76,7 +128,7 @@ class Depth_Grasp_Classifier_v3_nrm_ltag_col(nn.Module):
         self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
 
         self.classifier = nn.Sequential(
-            nn.Linear(5189, 1296),
+            nn.Linear(5190, 1296), # ADJUSTED FOR USE OF DIFFERENT NUMBER OF CLASSES, ORIGINALLY INPUT SIZE WAS 5189
             nn.BatchNorm1d(1296),
             nn.ReLU(),
             nn.Linear(1296, 2),
@@ -267,7 +319,7 @@ class Depth_Grasp_Classifier_v3_nrm_ltagp_col(nn.Module):
         self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
 
         self.classifier = nn.Sequential(
-            nn.Linear(5189, 1296),
+            nn.Linear(5190, 1296),
             nn.BatchNorm1d(1296),
             nn.ReLU(),
             nn.Linear(1296, 2),
