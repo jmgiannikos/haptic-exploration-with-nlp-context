@@ -4,6 +4,60 @@ import clip
 
 import grasp_cls_pipeline_configs as configs
 
+class Grasp_Classifier_Raw_CLIP_Balanced(nn.Module):
+    def __init__(self, embedding_dim=3000):
+        super().__init__()
+        self.cnn_feature_extract = nn.Sequential(
+            nn.Conv2d(6, 32, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 1),
+            nn.Conv2d(32, 576, kernel_size=9, stride=3, padding=3),
+            nn.BatchNorm2d(576),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            nn.Conv2d(576, 144, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(144),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
+
+        self.avg_pool = nn.AdaptiveAvgPool2d((6, 6))
+
+        self.clip_equalizer = nn.Sequential(
+            nn.Linear(768,embedding_dim),
+            torch.nn.Softmax(1)
+        )
+
+        self.haptic_equalizer = nn.Sequential(
+            nn.Linear(5184,embedding_dim),
+            torch.nn.Softmax(1)
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Linear(2*embedding_dim, 1296),
+            nn.BatchNorm1d(1296),
+            nn.ReLU(),
+            nn.Linear(1296, 2),
+            torch.nn.LogSoftmax(1)
+        )
+
+        self.nlp_model , _ = clip.load("ViT-L/14", device=configs.get_device())
+
+        self.name = "grasp classifier that uses only CLIP for language embeddings. Forces embeddings to same size and range"
+
+def forward(self, x, nlp_prompt):
+    x = self.cnn_feature_extract(x)
+    x = self.avg_pool(x)
+    x = torch.flatten(x, 1)
+    haptic_embedding = self.haptic_equalizer(x)
+    prompt_tokens = clip.tokenize(nlp_prompt).to(configs.get_device())
+    nlp_embedding = self.haptic_equalizer(self.nlp_model.encode_text(prompt_tokens))
+    x = torch.cat((haptic_embedding,nlp_embedding),1)
+    x = self.classifier(x)
+    return x
+
+
 class Grasp_Classifier_Raw_CLIP(nn.Module):
     def __init__(self):
         super().__init__()
@@ -106,6 +160,27 @@ class Depth_Grasp_Classifier_v3_norm_col_preset_CNN(nn.Module):
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         return x
+
+class Grasp_Classifier_v3_nrm_ltag_col_wrapper(nn.Module):
+    def __init__(self, grasp_classifier):
+        super().__init__()
+        self.cnn_feature_extract = grasp_classifier.cnn_feature_extract
+        self.avg_pool = grasp_classifier.avg_pool
+        self.classifier = grasp_classifier.classifier
+        self.nlp_model = grasp_classifier.nlp_model
+        self.name = "wrapper for intermediate activation in nlp model v3"
+
+    def forward(self, x, nlp_prompt):
+        x = self.cnn_feature_extract(x)
+        x = self.avg_pool(x)
+        x = torch.flatten(x, 1)
+        nlp_embedding = self.nlp_model(nlp_prompt)
+        self.nlp_embedding = nlp_embedding
+        x = torch.cat((x,nlp_embedding),1)
+        self.classifier_input = x
+        x = self.classifier(x)
+        return x, self.classifier_input
+
 
 class Depth_Grasp_Classifier_v3_nrm_ltag_col(nn.Module):
     def __init__(self, nlp_classifier):
